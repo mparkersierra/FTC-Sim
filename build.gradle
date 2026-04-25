@@ -1,0 +1,8 @@
+plugins {
+    id "java"
+}
+
+allprojects {
+    group = "com.mparkersierra.ftcsim"
+    version = "1.0.0"
+}

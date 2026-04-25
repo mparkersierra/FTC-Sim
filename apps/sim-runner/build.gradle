@@ -1,0 +1,12 @@
+plugins {
+    id "application"
+}
+
+dependencies {
+    implementation project(":packages:ftc-sdk-shim")
+    implementation project(":vendor:TeamCode")
+}
+
+application {
+    mainClass = "com.mparkersierra.ftcsim.runner.Main"
+}

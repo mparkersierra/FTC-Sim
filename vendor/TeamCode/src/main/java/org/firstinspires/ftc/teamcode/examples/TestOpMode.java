@@ -20,6 +20,9 @@ public class TestOpMode extends LinearOpMode {
         leftBack = hardwareMap.get(DcMotor.class, "leftBack");
         rightBack = hardwareMap.get(DcMotor.class, "rightBack");
 
+        leftFront.setDirection(DcMotor.Direction.REVERSE);
+        leftBack.setDirection(DcMotor.Direction.REVERSE);
+
         telemetry.addData("Status", "Initialized");
         telemetry.update(); 
 
@@ -36,5 +39,7 @@ public class TestOpMode extends LinearOpMode {
         rightFront.setPower(0);
         leftBack.setPower(0);
         rightBack.setPower(0);
+
+        sleep(1000);
     }
 }  
