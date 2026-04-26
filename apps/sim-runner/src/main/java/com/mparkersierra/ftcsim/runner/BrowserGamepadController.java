@@ -1,69 +1,48 @@
 package com.mparkersierra.ftcsim.runner;
 
-import com.qualcomm.robotcore.hardware.Gamepad;
+import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 
 public class BrowserGamepadController {
-    private final Gamepad gamepad;
-    private boolean wPressed;
-    private boolean sPressed;
-    private boolean aPressed;
-    private boolean dPressed;
-    private boolean arrowUpPressed;
-    private boolean arrowDownPressed;
-    private boolean arrowLeftPressed;
-    private boolean arrowRightPressed;
+    private final OpModeManager opModeManager;
 
-    public BrowserGamepadController(Gamepad gamepad) {
-        this.gamepad = gamepad;
+    public BrowserGamepadController(OpModeManager opModeManager) {
+        this.opModeManager = opModeManager;
     }
 
-    public synchronized void handleInput(String key, boolean pressed) {
+    public void handleInput(String key, boolean pressed) {
+        LinearOpMode opMode = opModeManager.getCurrentOpMode();
+        if (opMode == null) return;
+        
         switch (key.toLowerCase()) {
             case "w":
-                wPressed = pressed;
+                opMode.gamepad1.left_stick_y = pressed ? -1.0 : 0.0;
                 break;
             case "s":
-                sPressed = pressed;
+                opMode.gamepad1.left_stick_y = pressed ? 1.0 : 0.0;
                 break;
             case "a":
-                aPressed = pressed;
+                opMode.gamepad1.left_stick_x = pressed ? -1.0 : 0.0;
                 break;
             case "d":
-                dPressed = pressed;
-                break;
-            case " ":
-                gamepad.a = pressed;
+                opMode.gamepad1.left_stick_x = pressed ? 1.0 : 0.0;
                 break;
             case "arrowup":
-                arrowUpPressed = pressed;
+                opMode.gamepad1.right_stick_y = pressed ? -1.0 : 0.0;
                 break;
 
             case "arrowdown":
-                arrowDownPressed = pressed;
+                opMode.gamepad1.right_stick_y = pressed ? 1.0 : 0.0;
                 break;
 
             case "arrowleft":
-                arrowLeftPressed = pressed;
+                opMode.gamepad1.right_stick_x = pressed ? -1.0 : 0.0;
                 break;
 
             case "arrowright":
-                arrowRightPressed = pressed;
+                opMode.gamepad1.right_stick_x = pressed ? 1.0 : 0.0;
                 break;
             default:
                 return;
         }
-
-        gamepad.left_stick_y = axisValue(wPressed, sPressed, -1.0, 1.0);
-        gamepad.left_stick_x = axisValue(aPressed, dPressed, -1.0, 1.0);
-        gamepad.right_stick_y = axisValue(arrowUpPressed, arrowDownPressed, -1.0, 1.0);
-        gamepad.right_stick_x = axisValue(arrowLeftPressed, arrowRightPressed, -1.0, 1.0);
-    }
-
-    private double axisValue(boolean negativePressed, boolean positivePressed, double negativeValue, double positiveValue) {
-        if (negativePressed == positivePressed) {
-            return 0.0;
-        }
-
-        return negativePressed ? negativeValue : positiveValue;
     }
 }

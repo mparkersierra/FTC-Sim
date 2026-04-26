@@ -4,6 +4,8 @@ import com.qualcomm.robotcore.hardware.Gamepad;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 
+import java.util.concurrent.CountDownLatch;
+
 public abstract class LinearOpMode {
     public HardwareMap hardwareMap;
     public Telemetry telemetry;
@@ -11,13 +13,24 @@ public abstract class LinearOpMode {
     public Gamepad gamepad1 = new Gamepad();
     public Gamepad gamepad2 = new Gamepad();
 
-    private boolean active = false;
+    private volatile boolean active = false;
+    private final CountDownLatch startLatch = new CountDownLatch(1);
 
     public abstract void runOpMode();
 
     public void waitForStart() {
-        System.out.println("STARTED");
-        active = true;
+        try {
+            System.out.println("Waiting for START...");
+            startLatch.await();
+            active = true;
+            System.out.println("STARTED");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    public void internalStart() {
+        startLatch.countDown();
     }
 
     public boolean opModeIsActive() {

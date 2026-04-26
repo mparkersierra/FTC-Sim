@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>FTC Sim Viewer</title>
+  <title>FTC Sim</title>
   <style>
     body {
       margin: 0;
@@ -10,24 +10,80 @@
       font-family: Arial, sans-serif;
     }
 
-    #info {
-      position: fixed;
-      top: 12px;
-      left: 12px;
-      background: rgba(0,0,0,0.6);
-      padding: 10px;
-      border-radius: 8px;
+    .tabs {
+      display: flex;
+      background: #222;
+    }
+
+    button {
+      padding: 10px 14px;
+      border: none;
+      cursor: pointer;
+      background: #333;
+      color: white;
+    }
+
+    button:hover {
+      background: #444;
+    }
+
+    .tab {
+      display: none;
+    }
+
+    .tab.active {
+      display: block;
+    }
+
+    #driverStation {
+      padding: 20px;
     }
 
     canvas {
       display: block;
       background: #2f6f3e;
     }
+
+    #info {
+      position: fixed;
+      top: 60px;
+      left: 12px;
+      background: rgba(0,0,0,0.65);
+      padding: 10px;
+      border-radius: 8px;
+    }
+
+    select {
+      padding: 8px;
+      min-width: 300px;
+    }
   </style>
 </head>
 <body>
-  <div id="info">Connecting...</div>
-  <canvas id="field"></canvas>
+  <div class="tabs">
+    <button onclick="showTab('driverStation')">Driver Station</button>
+    <button onclick="showTab('fieldTab')">Field</button>
+  </div>
+
+  <div id="driverStation" class="tab active">
+    <h1>Driver Station</h1>
+
+    <button onclick="requestOpModes()">Scan OpModes</button>
+
+    <p>Select program:</p>
+    <select id="opModeSelect"></select>
+
+    <br><br>
+
+    <button id="mainActionButton" onclick="mainAction()">INIT</button>
+
+    <p id="status">Disconnected</p>
+  </div>
+
+  <div id="fieldTab" class="tab">
+    <div id="info">Connecting...</div>
+    <canvas id="field"></canvas>
+  </div>
 
   <script src="./src/main.js"></script>
 </body>

@@ -1,95 +1,111 @@
 package com.mparkersierra.ftcsim.runner;
 
-import org.java_websocket.server.WebSocketServer;
 import org.java_websocket.WebSocket;
 import org.java_websocket.handshake.ClientHandshake;
+import org.java_websocket.server.WebSocketServer;
 
 import java.net.InetSocketAddress;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class SimWebSocketServer extends WebSocketServer {
-    private static final Pattern KEY_PATTERN = Pattern.compile("\"key\"\\s*:\\s*\"((?:\\\\.|[^\"])*)\"");
-    private static final Pattern PRESSED_PATTERN = Pattern.compile("\"pressed\"\\s*:\\s*(true|false)");
+    private final OpModeManager opModeManager;
+    private final BrowserGamepadController controller;
 
-    private BrowserGamepadController controller;
+    private final RobotPose robotPose;
 
-    public SimWebSocketServer(int port) {
+    public SimWebSocketServer(int port, OpModeManager opModeManager, RobotPose robotPose) {
         super(new InetSocketAddress(port));
-    }
-
-    public void setController(BrowserGamepadController controller) {
-        this.controller = controller;
+        this.opModeManager = opModeManager;
+        this.robotPose = robotPose;
+        this.controller = new BrowserGamepadController(opModeManager);
+        this.opModeManager.setStopListener(this::broadcastOpModeStopped);
     }
 
     @Override
     public void onOpen(WebSocket conn, ClientHandshake handshake) {
-        System.out.println("Viewer connected");
-    }
-
-    @Override
-    public void onClose(WebSocket conn, int code, String reason, boolean remote) {
-        System.out.println("Viewer disconnected code=" + code + " reason=" + reason);
+        sendOpModes(conn);
     }
 
     @Override
     public void onMessage(WebSocket conn, String message) {
-        System.out.println("Received browser message: " + message);
-
-        if (controller == null) {
-            System.out.println("No browser gamepad controller is attached yet");
-            return;
+        if (message.contains("\"type\":\"getOpModes\"")) {
+            sendOpModes(conn);
+        } else if (message.contains("\"type\":\"init\"")) {
+            String id = extract(message, "id");
+            opModeManager.init(id);
+        } else if (message.contains("\"type\":\"start\"")) {
+            opModeManager.start();
+        } else if (message.contains("\"type\":\"stop\"")) {
+            opModeManager.stop();
+        } else if (message.contains("\"type\":\"key\"")) {
+            String key = extract(message, "key");
+            boolean pressed = message.contains("\"pressed\":true");
+            controller.handleInput(key, pressed);
+        } else if (message.contains("\"type\":\"setPose\"")) {
+            robotPose.x = extractDouble(message, "x");
+            robotPose.y = extractDouble(message, "y");
+            robotPose.heading = extractDouble(message, "heading");
         }
-
-        String key = extractKey(message);
-        Boolean pressed = extractPressed(message);
-
-        if (key == null || pressed == null) {
-            System.out.println("Ignoring browser message: " + message);
-            return;
-        }
-
-        System.out.println("Browser key " + key + " pressed=" + pressed);
-        controller.handleInput(key, pressed);
     }
 
-    @Override
-    public void onError(WebSocket conn, Exception ex) {
-        System.out.println("WebSocket error");
-        ex.printStackTrace();
+    private void sendOpModes(WebSocket conn) {
+        StringBuilder json = new StringBuilder();
+        json.append("{\"type\":\"opModes\",\"items\":[");
+
+        boolean first = true;
+        for (OpModeInfo info : opModeManager.getOpModes()) {
+            if (!first) json.append(",");
+            first = false;
+
+            json.append("{")
+                .append("\"id\":\"").append(info.id).append("\",")
+                .append("\"name\":\"").append(info.name).append("\",")
+                .append("\"group\":\"").append(info.group).append("\",")
+                .append("\"modeType\":\"").append(info.type).append("\"")
+                .append("}");
+        }
+
+        json.append("]}");
+        conn.send(json.toString());
     }
 
-    @Override
-    public void onStart() {
-        System.out.println("WebSocket server running on ws://localhost:8080");
+    private String extract(String json, String field) {
+        String pattern = "\"" + field + "\":\"";
+        int start = json.indexOf(pattern);
+        if (start == -1) return "";
+
+        start += pattern.length();
+        int end = json.indexOf("\"", start);
+        if (end == -1) return "";
+
+        return json.substring(start, end);
+    }
+
+    private double extractDouble(String json, String field) {
+        String pattern = "\"" + field + "\":";
+        int start = json.indexOf(pattern);
+        if (start == -1) return 0.0;
+
+        start += pattern.length();
+        int end = start;
+
+        while (end < json.length()) {
+            char c = json.charAt(end);
+            if (!(Character.isDigit(c) || c == '-' || c == '.')) break;
+            end++;
+        }
+
+        return Double.parseDouble(json.substring(start, end));
     }
 
     public void broadcastRobotState(double x, double y, double headingDegrees) {
-        String json = "{"
-            + "\"x\":" + x + ","
-            + "\"y\":" + y + ","
-            + "\"heading\":" + headingDegrees
-            + "}";
-
-        broadcast(json);
+        broadcast("{\"type\":\"robotState\",\"x\":" + x + ",\"y\":" + y + ",\"heading\":" + headingDegrees + "}");
     }
 
-    private String extractKey(String message) {
-        Matcher matcher = KEY_PATTERN.matcher(message);
-        if (!matcher.find()) {
-            return null;
-        }
-
-        String key = matcher.group(1);
-        return "\\s".equals(key) ? " " : key;
+    private void broadcastOpModeStopped() {
+        broadcast("{\"type\":\"opModeStopped\"}");
     }
 
-    private Boolean extractPressed(String message) {
-        Matcher matcher = PRESSED_PATTERN.matcher(message);
-        if (!matcher.find()) {
-            return null;
-        }
-
-        return Boolean.parseBoolean(matcher.group(1));
-    }
+    @Override public void onClose(WebSocket conn, int code, String reason, boolean remote) {}
+    @Override public void onError(WebSocket conn, Exception ex) { ex.printStackTrace(); }
+    @Override public void onStart() { System.out.println("WebSocket running on ws://localhost:8080"); }
 }

@@ -1,18 +1,11 @@
 package com.mparkersierra.ftcsim.runner;
 
-import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
-import org.firstinspires.ftc.teamcode.examples.TestMecanum;
 
 public class Main {
     public static void main(String[] args) throws Exception {
-        SimWebSocketServer server = new SimWebSocketServer(8080);
-        server.start();
-
-        LinearOpMode opMode = new TestMecanum();
-
         HardwareMap hardwareMap = new HardwareMap();
 
         DcMotor leftFront = new DcMotor();
@@ -25,27 +18,20 @@ public class Main {
         hardwareMap.put("leftBack", leftBack);
         hardwareMap.put("rightBack", rightBack);
 
-        opMode.hardwareMap = hardwareMap;
-        opMode.telemetry = new Telemetry();
+        OpModeManager opModeManager = new OpModeManager(hardwareMap, new Telemetry());
 
-        BrowserGamepadController controller =
-            new BrowserGamepadController(opMode.gamepad1);
+        RobotPose robotPose = new RobotPose();
 
-        server.setController(controller);
+        SimWebSocketServer server = new SimWebSocketServer(8080, opModeManager, robotPose);
+        server.start();
 
-        Thread opModeThread = new Thread(opMode::runOpMode);
-        opModeThread.start();
-
-        double robotX = 0.0;      // field X, left/right
-        double robotY = 0.0;      // field Y, forward/back
-        double heading = 0.0;     // radians
 
         long lastTime = System.nanoTime();
 
         final double MAX_SPEED = 0.5;       // inches per second at full power
         final double MAX_TURN_SPEED = 0.5;   // radians per second at full turn power
 
-        while (opModeThread.isAlive()) {
+        while (true) {
             //System.out.println("Running" + opMode.gamepad1.left_stick_y);
             long nowNano = System.nanoTime();
             double dt = (nowNano - lastTime) / 1_000_000_000.0;
@@ -64,24 +50,22 @@ public class Main {
             double robotVx = strafe * MAX_SPEED;
             double robotVy = forward * MAX_SPEED;
 
-            double cos = Math.cos(heading);
-            double sin = Math.sin(heading);
+            double cos = Math.cos(robotPose.heading);
+            double sin = Math.sin(robotPose.heading);
 
             // rotate robot-relative movement by current heading
             double fieldVx = robotVx * cos - robotVy * sin;
             double fieldVy = robotVx * sin + robotVy * cos;
 
-            robotX += fieldVx * dt;
-            robotY += fieldVy * dt;
+            robotPose.x += fieldVx * dt;
+            robotPose.y += fieldVy * dt;
 
-            heading += turn * MAX_TURN_SPEED * dt;
-            heading = Math.atan2(Math.sin(heading), Math.cos(heading));
+            robotPose.heading += turn * MAX_TURN_SPEED * dt;
+            robotPose.heading = Math.atan2(Math.sin(robotPose.heading), Math.cos(robotPose.heading));
 
-            server.broadcastRobotState(robotX, robotY, heading);
+            server.broadcastRobotState(robotPose.x, robotPose.y, robotPose.heading);
 
             Thread.sleep(20);
         }
-
-        server.stop();
     }
 }

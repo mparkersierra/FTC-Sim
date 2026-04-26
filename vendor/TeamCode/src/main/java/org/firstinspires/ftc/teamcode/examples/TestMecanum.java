@@ -4,7 +4,9 @@ import org.firstinspires.ftc.teamcode.hardware.RobotHardware;
 import org.firstinspires.ftc.teamcode.software.MecanumDrive;
 
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
+@TeleOp(name = "Test Mecanum", group = "Examples")
 public class TestMecanum extends LinearOpMode {
 
     @Override

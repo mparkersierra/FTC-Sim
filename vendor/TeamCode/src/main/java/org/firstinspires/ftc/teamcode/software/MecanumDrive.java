@@ -66,7 +66,7 @@ public class MecanumDrive {
         leftBackPower   /= max;
         rightBackPower  /= max;
 
-        robot.lf.setPower(0);
+        robot.lf.setPower(leftFrontPower);
         robot.rf.setPower(rightFrontPower);
         robot.lb.setPower(leftBackPower);
         robot.rb.setPower(rightBackPower);
