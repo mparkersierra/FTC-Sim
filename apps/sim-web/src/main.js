@@ -1,29 +1,63 @@
 const canvas = document.getElementById("field");
-const info = document.getElementById("info");
 const ctx = canvas.getContext("2d");
+const info = document.getElementById("info");
+
+const allowedKeys = [
+  "w", "a", "s", "d", " ",
+  "arrowup", "arrowdown", "arrowleft", "arrowright"
+];
 
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-let robot = {
-  x: 0,
-  y: 0,
-  heading: 0
-};
+let robot = { x: 0, y: 0, heading: 0 };
+let socket;
 
-const socket = new WebSocket("ws://localhost:8080");
+function connect() {
+  socket = new WebSocket("ws://localhost:8080");
 
-socket.onopen = () => {
-  info.textContent = "Connected";
-};
+  socket.onopen = () => {
+    info.textContent = "Connected";
+  };
 
-socket.onmessage = (event) => {
-  robot = JSON.parse(event.data);
-};
+  socket.onmessage = (event) => {
+    robot = JSON.parse(event.data);
+  };
 
-socket.onclose = () => {
-  info.textContent = "Disconnected";
-};
+  socket.onclose = () => {
+    info.textContent = "Disconnected";
+  };
+}
+
+function sendKey(key, pressed) {
+  if (!socket || socket.readyState !== WebSocket.OPEN) return;
+
+  socket.send(JSON.stringify({
+    type: "key",
+    key,
+    pressed
+  }));
+}
+
+window.addEventListener("keydown", (event) => {
+  if (event.repeat) return;
+
+  const key = event.key.toLowerCase();
+
+  if (allowedKeys.includes(key)) {
+    event.preventDefault();
+    sendKey(key, true);
+  }
+});
+
+window.addEventListener("keyup", (event) => {
+  const key = event.key.toLowerCase();
+
+  if (allowedKeys.includes(key)) {
+    event.preventDefault();
+    sendKey(key, false);
+  }
+});
 
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -32,7 +66,7 @@ function draw() {
   drawRobot();
 
   info.textContent =
-    `x=${robot.x.toFixed(2)} y=${robot.y.toFixed(2)} heading=${robot.heading.toFixed(1)}`;
+    `x=${robot.x.toFixed(2)} y=${robot.y.toFixed(2)} heading=${(robot.heading * 180 / Math.PI).toFixed(1)}`;
 
   requestAnimationFrame(draw);
 }
@@ -67,21 +101,18 @@ function drawRobot() {
   const screenX = canvas.width / 2 + robot.x * scale;
   const screenY = canvas.height / 2 - robot.y * scale;
 
-  const robotWidth = 70;
-  const robotHeight = 70;
-
   ctx.save();
-
   ctx.translate(screenX, screenY);
-  ctx.rotate(robot.heading);
+  ctx.rotate(-robot.heading);
 
   ctx.fillStyle = "#ddd";
-  ctx.fillRect(-robotWidth / 2, -robotHeight / 2, robotWidth, robotHeight);
+  ctx.fillRect(-35, -35, 70, 70);
 
   ctx.fillStyle = "#ff4444";
-  ctx.fillRect(-10, -robotHeight / 2, 20, 15);
+  ctx.fillRect(-10, -35, 20, 15);
 
   ctx.restore();
 }
 
+connect();
 draw();
