@@ -1,4 +1,4 @@
-package com.mparkersierra.ftcsim.runner;
+package com.mparkersierra.ftcsim.runner.opmode;
 
 public class OpModeInfo {
     public final String id;

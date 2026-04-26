@@ -1,5 +1,10 @@
-package com.mparkersierra.ftcsim.runner;
+package com.mparkersierra.ftcsim.runner.network;
 
+import com.mparkersierra.ftcsim.runner.hardware.SimHardwareRegistry;
+import com.mparkersierra.ftcsim.runner.input.BrowserGamepadController;
+import com.mparkersierra.ftcsim.runner.opmode.OpModeInfo;
+import com.mparkersierra.ftcsim.runner.opmode.OpModeManager;
+import com.mparkersierra.ftcsim.runner.simulation.RobotPose;
 import org.java_websocket.WebSocket;
 import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.server.WebSocketServer;
@@ -12,12 +17,19 @@ public class SimWebSocketServer extends WebSocketServer {
 
     private final RobotPose robotPose;
 
-    public SimWebSocketServer(int port, OpModeManager opModeManager, RobotPose robotPose) {
+    private final SimHardwareRegistry hardwareRegistry;
+
+    public SimWebSocketServer(
+        int port,
+        OpModeManager opModeManager,
+        RobotPose robotPose,
+        SimHardwareRegistry hardwareRegistry
+    ) {
         super(new InetSocketAddress(port));
         this.opModeManager = opModeManager;
         this.robotPose = robotPose;
+        this.hardwareRegistry = hardwareRegistry;
         this.controller = new BrowserGamepadController(opModeManager);
-        this.opModeManager.setStopListener(this::broadcastOpModeStopped);
     }
 
     @Override
@@ -44,6 +56,8 @@ public class SimWebSocketServer extends WebSocketServer {
             robotPose.x = extractDouble(message, "x");
             robotPose.y = extractDouble(message, "y");
             robotPose.heading = extractDouble(message, "heading");
+        } else if (message.contains("\"type\":\"setHardwareMap\"")) {
+            updateHardwareMap(message);
         }
     }
 
@@ -66,6 +80,23 @@ public class SimWebSocketServer extends WebSocketServer {
 
         json.append("]}");
         conn.send(json.toString());
+    }
+
+    private void updateHardwareMap(String message) {
+        hardwareRegistry.clear();
+
+        String marker = "{\"type\":\"DcMotor\",\"name\":\"";
+        String[] parts = message.split(java.util.regex.Pattern.quote(marker));
+
+        for (int i = 1; i < parts.length; i++) {
+            String name = parts[i].split("\"")[0];
+
+            if (!name.isBlank()) {
+                hardwareRegistry.addDevice("DcMotor", name);
+            }
+        }
+
+        System.out.println("Hardware map updated.");
     }
 
     private String extract(String json, String field) {

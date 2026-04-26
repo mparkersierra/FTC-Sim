@@ -1,4 +1,4 @@
-package com.mparkersierra.ftcsim.runner;
+package com.mparkersierra.ftcsim.runner.opmode;
 
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;

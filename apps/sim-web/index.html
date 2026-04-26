@@ -21,6 +21,7 @@
       cursor: pointer;
       background: #333;
       color: white;
+      margin-right: 6px;
     }
 
     button:hover {
@@ -35,7 +36,8 @@
       display: block;
     }
 
-    #driverStation {
+    #driverStation,
+    #hardwareTab {
       padding: 20px;
     }
 
@@ -53,15 +55,22 @@
       border-radius: 8px;
     }
 
-    select {
+    select,
+    input {
       padding: 8px;
-      min-width: 300px;
+      min-width: 220px;
+      margin-right: 8px;
+    }
+
+    .hardware-row {
+      margin: 12px 0;
     }
   </style>
 </head>
 <body>
   <div class="tabs">
     <button onclick="showTab('driverStation')">Driver Station</button>
+    <button onclick="showTab('hardwareTab')">Hardware Map</button>
     <button onclick="showTab('fieldTab')">Field</button>
   </div>
 
@@ -78,6 +87,17 @@
     <button id="mainActionButton" onclick="mainAction()">INIT</button>
 
     <p id="status">Disconnected</p>
+  </div>
+
+  <div id="hardwareTab" class="tab">
+    <h1>Hardware Map</h1>
+
+    <p>Add hardware names so code like <code>hardwareMap.get(DcMotor.class, "leftFront")</code> works.</p>
+
+    <button onclick="addHardwareRow()">+ Add Component</button>
+    <button onclick="saveHardwareMap()">Save Hardware Map</button>
+
+    <div id="hardwareRows"></div>
   </div>
 
   <div id="fieldTab" class="tab">

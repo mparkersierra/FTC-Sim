@@ -10,6 +10,10 @@ public class HardwareMap {
         devices.put(name, device);
     }
 
+    public void clear() {
+        devices.clear();
+    }
+
     public <T> T get(Class<T> type, String name) {
         Object device = devices.get(name);
 

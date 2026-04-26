@@ -3,6 +3,8 @@ const ctx = canvas.getContext("2d");
 const info = document.getElementById("info");
 const statusEl = document.getElementById("status");
 const opModeSelect = document.getElementById("opModeSelect");
+const mainActionButton = document.getElementById("mainActionButton");
+const hardwareRows = document.getElementById("hardwareRows");
 
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight - 42;
@@ -10,12 +12,26 @@ canvas.height = window.innerHeight - 42;
 let robot = { x: 0, y: 0, heading: 0 };
 let socket;
 
-let simStatus = "stopped"; 
+let simStatus = "stopped";
 
 let draggingRobot = false;
 let rotatingRobot = false;
 let dragOffsetX = 0;
 let dragOffsetY = 0;
+
+const FIELD_SCALE = 100;
+const ROBOT_HALF_SIZE = 35;
+const ROTATION_HANDLE_LENGTH = 70;
+const ROTATION_HANDLE_RADIUS = 9;
+
+const hardwareTypes = ["DcMotor"];
+
+let hardwareMapConfig = [
+  { type: "DcMotor", name: "leftFront" },
+  { type: "DcMotor", name: "rightFront" },
+  { type: "DcMotor", name: "leftBack" },
+  { type: "DcMotor", name: "rightBack" }
+];
 
 function showTab(id) {
   document.querySelectorAll(".tab").forEach(tab => tab.classList.remove("active"));
@@ -29,6 +45,7 @@ function connect() {
     statusEl.textContent = "Connected";
     info.textContent = "Connected";
     requestOpModes();
+    saveHardwareMap();
   };
 
   socket.onmessage = (event) => {
@@ -52,8 +69,6 @@ function connect() {
     info.textContent = "Disconnected";
   };
 }
-
-const mainActionButton = document.getElementById("mainActionButton");
 
 function updateMainButton() {
   if (simStatus === "stopped") {
@@ -97,6 +112,8 @@ function renderOpModes(items) {
 }
 
 function initOpMode() {
+  saveHardwareMap();
+
   send({
     type: "init",
     id: opModeSelect.value
@@ -125,6 +142,76 @@ function setStopped() {
   simStatus = "stopped";
   statusEl.textContent = "Stopped";
   updateMainButton();
+}
+
+function renderHardwareRows() {
+  hardwareRows.innerHTML = "";
+
+  hardwareMapConfig.forEach((item, index) => {
+    const row = document.createElement("div");
+    row.className = "hardware-row";
+
+    const typeSelect = document.createElement("select");
+
+    hardwareTypes.forEach(type => {
+      const option = document.createElement("option");
+      option.value = type;
+      option.textContent = type;
+      option.selected = item.type === type;
+      typeSelect.appendChild(option);
+    });
+
+    typeSelect.onchange = () => {
+      hardwareMapConfig[index].type = typeSelect.value;
+    };
+
+    const nameInput = document.createElement("input");
+    nameInput.placeholder = "hardware name";
+    nameInput.value = item.name;
+
+    nameInput.oninput = () => {
+      hardwareMapConfig[index].name = nameInput.value;
+    };
+
+    const deleteButton = document.createElement("button");
+    deleteButton.textContent = "Remove";
+
+    deleteButton.onclick = () => {
+      hardwareMapConfig.splice(index, 1);
+      renderHardwareRows();
+    };
+
+    row.appendChild(typeSelect);
+    row.appendChild(nameInput);
+    row.appendChild(deleteButton);
+
+    hardwareRows.appendChild(row);
+  });
+}
+
+function addHardwareRow() {
+  hardwareMapConfig.push({
+    type: "DcMotor",
+    name: ""
+  });
+
+  renderHardwareRows();
+}
+
+function saveHardwareMap() {
+  const cleaned = hardwareMapConfig
+    .map(item => ({
+      type: item.type,
+      name: item.name.trim()
+    }))
+    .filter(item => item.name.length > 0);
+
+  send({
+    type: "setHardwareMap",
+    devices: cleaned
+  });
+
+  statusEl.textContent = "Hardware map saved";
 }
 
 const allowedKeys = [
@@ -184,42 +271,91 @@ function drawField() {
 }
 
 function drawRobot() {
-  const scale = 100;
-  const screenX = canvas.width / 2 + robot.x * scale;
-  const screenY = canvas.height / 2 - robot.y * scale;
+  const screenX = canvas.width / 2 + robot.x * FIELD_SCALE;
+  const screenY = canvas.height / 2 - robot.y * FIELD_SCALE;
+
+  if (simStatus === "stopped") {
+    drawRotationHandle(screenX, screenY);
+  }
 
   ctx.save();
   ctx.translate(screenX, screenY);
   ctx.rotate(-robot.heading);
 
   ctx.fillStyle = "#ddd";
-  ctx.fillRect(-35, -35, 70, 70);
+  ctx.fillRect(-ROBOT_HALF_SIZE, -ROBOT_HALF_SIZE, ROBOT_HALF_SIZE * 2, ROBOT_HALF_SIZE * 2);
 
   ctx.fillStyle = "#ff4444";
-  ctx.fillRect(-10, -35, 20, 15);
+  ctx.fillRect(-10, -ROBOT_HALF_SIZE, 20, 15);
 
   ctx.restore();
 }
 
+function drawRotationHandle(screenX, screenY) {
+  const handle = rotationHandlePosition();
+  const front = robotFrontPosition();
+
+  ctx.save();
+  ctx.strokeStyle = "#f7d84a";
+  ctx.fillStyle = "#f7d84a";
+  ctx.lineWidth = 3;
+  ctx.lineCap = "round";
+
+  ctx.beginPath();
+  ctx.moveTo(front.x, front.y);
+  ctx.lineTo(handle.x, handle.y);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(handle.x, handle.y, ROTATION_HANDLE_RADIUS, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
 function robotScreenPosition() {
-  const scale = 100;
   return {
-    x: canvas.width / 2 + robot.x * scale,
-    y: canvas.height / 2 - robot.y * scale
+    x: canvas.width / 2 + robot.x * FIELD_SCALE,
+    y: canvas.height / 2 - robot.y * FIELD_SCALE
   };
 }
 
 function screenToWorld(screenX, screenY) {
-  const scale = 100;
   return {
-    x: (screenX - canvas.width / 2) / scale,
-    y: -(screenY - canvas.height / 2) / scale
+    x: (screenX - canvas.width / 2) / FIELD_SCALE,
+    y: -(screenY - canvas.height / 2) / FIELD_SCALE
   };
 }
 
 function isMouseOnRobot(mouseX, mouseY) {
   const pos = robotScreenPosition();
   return Math.abs(mouseX - pos.x) < 45 && Math.abs(mouseY - pos.y) < 45;
+}
+
+function rotationHandlePosition() {
+  const pos = robotScreenPosition();
+  const distance = ROBOT_HALF_SIZE + ROTATION_HANDLE_LENGTH;
+
+  return {
+    x: pos.x - Math.sin(robot.heading) * distance,
+    y: pos.y - Math.cos(robot.heading) * distance
+  };
+}
+
+function robotFrontPosition() {
+  const pos = robotScreenPosition();
+
+  return {
+    x: pos.x - Math.sin(robot.heading) * ROBOT_HALF_SIZE,
+    y: pos.y - Math.cos(robot.heading) * ROBOT_HALF_SIZE
+  };
+}
+
+function isMouseOnRotationHandle(mouseX, mouseY) {
+  const handle = rotationHandlePosition();
+  const dx = mouseX - handle.x;
+  const dy = mouseY - handle.y;
+
+  return Math.hypot(dx, dy) <= ROTATION_HANDLE_RADIUS + 6;
 }
 
 function sendPose() {
@@ -238,11 +374,9 @@ canvas.addEventListener("mousedown", (event) => {
   const mouseX = event.clientX - rect.left;
   const mouseY = event.clientY - rect.top;
 
-  if (!isMouseOnRobot(mouseX, mouseY)) return;
-
-  if (event.shiftKey) {
+  if (isMouseOnRotationHandle(mouseX, mouseY) || (event.shiftKey && isMouseOnRobot(mouseX, mouseY))) {
     rotatingRobot = true;
-  } else {
+  } else if (isMouseOnRobot(mouseX, mouseY)) {
     draggingRobot = true;
 
     const pos = robotScreenPosition();
@@ -268,8 +402,31 @@ canvas.addEventListener("mousemove", (event) => {
   if (rotatingRobot) {
     const pos = robotScreenPosition();
     const angle = Math.atan2(mouseY - pos.y, mouseX - pos.x);
-    robot.heading = angle * 180 / Math.PI + 90;
+    robot.heading = -(angle + Math.PI / 2);
     sendPose();
+  }
+});
+
+canvas.addEventListener("mouseleave", () => {
+  canvas.style.cursor = "";
+});
+
+canvas.addEventListener("mousemove", (event) => {
+  if (simStatus !== "stopped" || draggingRobot || rotatingRobot) {
+    canvas.style.cursor = "";
+    return;
+  }
+
+  const rect = canvas.getBoundingClientRect();
+  const mouseX = event.clientX - rect.left;
+  const mouseY = event.clientY - rect.top;
+
+  if (isMouseOnRotationHandle(mouseX, mouseY)) {
+    canvas.style.cursor = "grab";
+  } else if (isMouseOnRobot(mouseX, mouseY)) {
+    canvas.style.cursor = "move";
+  } else {
+    canvas.style.cursor = "";
   }
 });
 
@@ -280,4 +437,5 @@ window.addEventListener("mouseup", () => {
 
 connect();
 updateMainButton();
+renderHardwareRows();
 draw();

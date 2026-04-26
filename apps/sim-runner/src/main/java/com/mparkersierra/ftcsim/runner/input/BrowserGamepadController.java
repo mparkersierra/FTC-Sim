@@ -1,5 +1,6 @@
-package com.mparkersierra.ftcsim.runner;
+package com.mparkersierra.ftcsim.runner.input;
 
+import com.mparkersierra.ftcsim.runner.opmode.OpModeManager;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 
 public class BrowserGamepadController {

@@ -1,4 +1,4 @@
-package com.mparkersierra.ftcsim.runner;
+package com.mparkersierra.ftcsim.runner.simulation;
 
 public class RobotPose {
     public volatile double x = 0.0;
