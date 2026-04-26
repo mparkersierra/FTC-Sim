@@ -48,6 +48,11 @@ public class SimWebSocketServer extends WebSocketServer {
             opModeManager.start();
         } else if (message.contains("\"type\":\"stop\"")) {
             opModeManager.stop();
+        } else if (message.contains("\"type\":\"gamepad\"")) {
+            int gamepadNumber = extractInt(message, "gamepad");
+            String control = extract(message, "control");
+            boolean pressed = message.contains("\"pressed\":true");
+            controller.handleGamepadInput(gamepadNumber, control, pressed);
         } else if (message.contains("\"type\":\"key\"")) {
             String key = extract(message, "key");
             boolean pressed = message.contains("\"pressed\":true");
@@ -126,6 +131,25 @@ public class SimWebSocketServer extends WebSocketServer {
         }
 
         return Double.parseDouble(json.substring(start, end));
+    }
+
+    private int extractInt(String json, String field) {
+        String pattern = "\"" + field + "\":";
+        int start = json.indexOf(pattern);
+        if (start == -1) return 0;
+
+        start += pattern.length();
+        int end = start;
+
+        while (end < json.length()) {
+            char c = json.charAt(end);
+            if (!Character.isDigit(c)) break;
+            end++;
+        }
+
+        if (start == end) return 0;
+
+        return Integer.parseInt(json.substring(start, end));
     }
 
     public void broadcastRobotState(double x, double y, double headingDegrees) {

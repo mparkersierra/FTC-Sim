@@ -5,6 +5,9 @@ const statusEl = document.getElementById("status");
 const opModeSelect = document.getElementById("opModeSelect");
 const mainActionButton = document.getElementById("mainActionButton");
 const hardwareRows = document.getElementById("hardwareRows");
+const inputPalette = document.getElementById("inputPalette");
+const gamepadMappings = document.getElementById("gamepadMappings");
+const bindingHint = document.getElementById("bindingHint");
 
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight - 42;
@@ -25,6 +28,51 @@ const ROTATION_HANDLE_LENGTH = 70;
 const ROTATION_HANDLE_RADIUS = 9;
 
 const hardwareTypes = ["DcMotor"];
+const gamepadControls = [
+  { id: "left_stick_up", label: "Left Stick Up" },
+  { id: "left_stick_down", label: "Left Stick Down" },
+  { id: "left_stick_left", label: "Left Stick Left" },
+  { id: "left_stick_right", label: "Left Stick Right" },
+  { id: "right_stick_up", label: "Right Stick Up" },
+  { id: "right_stick_down", label: "Right Stick Down" },
+  { id: "right_stick_left", label: "Right Stick Left" },
+  { id: "right_stick_right", label: "Right Stick Right" },
+  { id: "dpad_up", label: "D-Pad Up" },
+  { id: "dpad_down", label: "D-Pad Down" },
+  { id: "dpad_left", label: "D-Pad Left" },
+  { id: "dpad_right", label: "D-Pad Right" },
+  { id: "a", label: "A" },
+  { id: "b", label: "B" },
+  { id: "x", label: "X" },
+  { id: "y", label: "Y" },
+  { id: "left_bumper", label: "Left Bumper" },
+  { id: "right_bumper", label: "Right Bumper" },
+  { id: "left_trigger", label: "Left Trigger" },
+  { id: "right_trigger", label: "Right Trigger" }
+];
+const bindableInputs = [
+  { code: "w", label: "W" },
+  { code: "a", label: "A" },
+  { code: "s", label: "S" },
+  { code: "d", label: "D" },
+  { code: "arrowup", label: "Up" },
+  { code: "arrowdown", label: "Down" },
+  { code: "arrowleft", label: "Left" },
+  { code: "arrowright", label: "Right" },
+  { code: " ", label: "Space" },
+  { code: "q", label: "Q" },
+  { code: "e", label: "E" },
+  { code: "r", label: "R" },
+  { code: "f", label: "F" },
+  { code: "z", label: "Z" },
+  { code: "x", label: "X" },
+  { code: "c", label: "C" },
+  { code: "v", label: "V" },
+  { code: "1", label: "1" },
+  { code: "2", label: "2" },
+  { code: "3", label: "3" },
+  { code: "4", label: "4" }
+];
 
 let hardwareMapConfig = [
   { type: "DcMotor", name: "leftFront" },
@@ -33,9 +81,35 @@ let hardwareMapConfig = [
   { type: "DcMotor", name: "rightBack" }
 ];
 
+let gamepadMappingConfig = {
+  1: {
+    left_stick_up: "w",
+    left_stick_down: "s",
+    left_stick_left: "a",
+    left_stick_right: "d",
+    right_stick_up: "arrowup",
+    right_stick_down: "arrowdown",
+    right_stick_left: "arrowleft",
+    right_stick_right: "arrowright",
+    a: " ",
+    b: "e",
+    x: "q",
+    y: "r",
+    left_bumper: "z",
+    right_bumper: "c"
+  },
+  2: {}
+};
+
+let activeBinding = null;
+const pressedBindings = new Map();
+
 function showTab(id) {
   document.querySelectorAll(".tab").forEach(tab => tab.classList.remove("active"));
   document.getElementById(id).classList.add("active");
+  document.querySelectorAll("[data-tab-button]").forEach(button => {
+    button.classList.toggle("active", button.dataset.tabButton === id);
+  });
 }
 
 function connect() {
@@ -214,26 +288,165 @@ function saveHardwareMap() {
   statusEl.textContent = "Hardware map saved";
 }
 
-const allowedKeys = [
-  "w", "a", "s", "d", " ",
-  "arrowup", "arrowdown", "arrowleft", "arrowright"
-];
+function renderInputPalette() {
+  inputPalette.innerHTML = "";
+
+  bindableInputs.forEach(input => {
+    const button = document.createElement("button");
+    button.textContent = input.label;
+    button.onclick = () => assignActiveBinding(input.code);
+    inputPalette.appendChild(button);
+  });
+
+  const clearButton = document.createElement("button");
+  clearButton.textContent = "Clear";
+  clearButton.onclick = () => assignActiveBinding("");
+  inputPalette.appendChild(clearButton);
+}
+
+function renderGamepadMappings() {
+  gamepadMappings.innerHTML = "";
+
+  [1, 2].forEach(gamepadNumber => {
+    const panel = document.createElement("section");
+    panel.className = "gamepad-config";
+
+    const heading = document.createElement("h3");
+    heading.textContent = `Gamepad ${gamepadNumber}`;
+    panel.appendChild(heading);
+
+    const grid = document.createElement("div");
+    grid.className = "mapping-grid";
+
+    gamepadControls.forEach(control => {
+      const slot = document.createElement("button");
+      slot.className = "mapping-slot";
+      slot.classList.toggle(
+        "active",
+        activeBinding &&
+          activeBinding.gamepadNumber === gamepadNumber &&
+          activeBinding.control === control.id
+      );
+
+      const label = document.createElement("span");
+      label.className = "mapping-label";
+      label.textContent = control.label;
+
+      const value = document.createElement("span");
+      value.className = "mapping-value";
+      value.textContent = inputLabel(gamepadMappingConfig[gamepadNumber][control.id]);
+
+      slot.onclick = () => {
+        activeBinding = { gamepadNumber, control: control.id };
+        bindingHint.textContent = `Choose input for Gamepad ${gamepadNumber} ${control.label}`;
+        renderGamepadMappings();
+      };
+
+      slot.appendChild(label);
+      slot.appendChild(value);
+      grid.appendChild(slot);
+    });
+
+    panel.appendChild(grid);
+    gamepadMappings.appendChild(panel);
+  });
+}
+
+function inputLabel(code) {
+  if (!code) return "Unassigned";
+
+  const input = bindableInputs.find(item => item.code === code);
+  return input ? input.label : code.toUpperCase();
+}
+
+function assignActiveBinding(code) {
+  if (!activeBinding) return;
+
+  Object.values(gamepadMappingConfig).forEach(mapping => {
+    Object.keys(mapping).forEach(control => {
+      if (code && mapping[control] === code) {
+        delete mapping[control];
+      }
+    });
+  });
+
+  if (code) {
+    gamepadMappingConfig[activeBinding.gamepadNumber][activeBinding.control] = code;
+    bindingHint.textContent = `${inputLabel(code)} assigned`;
+  } else {
+    delete gamepadMappingConfig[activeBinding.gamepadNumber][activeBinding.control];
+    bindingHint.textContent = "Mapping cleared";
+  }
+
+  activeBinding = null;
+  renderGamepadMappings();
+}
+
+function bindingsForKey(key) {
+  const bindings = [];
+
+  [1, 2].forEach(gamepadNumber => {
+    Object.entries(gamepadMappingConfig[gamepadNumber]).forEach(([control, mappedKey]) => {
+      if (mappedKey === key) {
+        bindings.push({ gamepadNumber, control });
+      }
+    });
+  });
+
+  return bindings;
+}
+
+function bindingId(binding) {
+  return `${binding.gamepadNumber}:${binding.control}`;
+}
+
+function sendBinding(binding, pressed) {
+  send({
+    type: "gamepad",
+    gamepad: binding.gamepadNumber,
+    control: binding.control,
+    pressed
+  });
+}
 
 window.addEventListener("keydown", (event) => {
   const key = event.key.toLowerCase();
 
-  if (allowedKeys.includes(key)) {
+  if (activeBinding) {
     event.preventDefault();
-    send({ type: "key", key, pressed: true });
+    assignActiveBinding(key);
+    return;
+  }
+
+  const bindings = bindingsForKey(key);
+
+  if (bindings.length > 0) {
+    event.preventDefault();
+    bindings.forEach(binding => {
+      const id = bindingId(binding);
+
+      if (!pressedBindings.has(id)) {
+        pressedBindings.set(id, binding);
+        sendBinding(binding, true);
+      }
+    });
   }
 });
 
 window.addEventListener("keyup", (event) => {
   const key = event.key.toLowerCase();
+  const bindings = bindingsForKey(key);
 
-  if (allowedKeys.includes(key)) {
+  if (bindings.length > 0) {
     event.preventDefault();
-    send({ type: "key", key, pressed: false });
+    bindings.forEach(binding => {
+      const id = bindingId(binding);
+
+      if (pressedBindings.has(id)) {
+        pressedBindings.delete(id);
+        sendBinding(binding, false);
+      }
+    });
   }
 });
 
@@ -436,6 +649,9 @@ window.addEventListener("mouseup", () => {
 });
 
 connect();
+showTab("driverStation");
 updateMainButton();
 renderHardwareRows();
+renderInputPalette();
+renderGamepadMappings();
 draw();

@@ -28,6 +28,10 @@
       background: #444;
     }
 
+    button.active {
+      background: #555;
+    }
+
     .tab {
       display: none;
     }
@@ -37,7 +41,7 @@
     }
 
     #driverStation,
-    #hardwareTab {
+    #configurationTab {
       padding: 20px;
     }
 
@@ -62,16 +66,88 @@
       margin-right: 8px;
     }
 
+    h2 {
+      margin-top: 28px;
+    }
+
     .hardware-row {
       margin: 12px 0;
+    }
+
+    .config-actions {
+      display: flex;
+      gap: 8px;
+      margin: 12px 0 18px;
+    }
+
+    .gamepad-configs {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 18px;
+    }
+
+    .gamepad-config {
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 14px;
+      background: #181818;
+    }
+
+    .mapping-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px;
+    }
+
+    .mapping-slot {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      min-height: 66px;
+      padding: 10px;
+      border: 1px solid #444;
+      border-radius: 6px;
+      background: #242424;
+    }
+
+    .mapping-slot.active {
+      border-color: #f7d84a;
+      background: #343018;
+    }
+
+    .mapping-label {
+      color: #bbb;
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+
+    .mapping-value {
+      font-weight: bold;
+    }
+
+    .input-palette {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 12px 0 24px;
+    }
+
+    .input-palette button {
+      margin-right: 0;
+      min-width: 52px;
+    }
+
+    #bindingHint {
+      min-height: 20px;
+      color: #f7d84a;
     }
   </style>
 </head>
 <body>
   <div class="tabs">
-    <button onclick="showTab('driverStation')">Driver Station</button>
-    <button onclick="showTab('hardwareTab')">Hardware Map</button>
-    <button onclick="showTab('fieldTab')">Field</button>
+    <button data-tab-button="driverStation" onclick="showTab('driverStation')">Driver Station</button>
+    <button data-tab-button="configurationTab" onclick="showTab('configurationTab')">Configuration</button>
+    <button data-tab-button="fieldTab" onclick="showTab('fieldTab')">Field</button>
   </div>
 
   <div id="driverStation" class="tab active">
@@ -89,15 +165,25 @@
     <p id="status">Disconnected</p>
   </div>
 
-  <div id="hardwareTab" class="tab">
-    <h1>Hardware Map</h1>
+  <div id="configurationTab" class="tab">
+    <h1>Configuration</h1>
+
+    <h2>Hardware Map</h2>
 
     <p>Add hardware names so code like <code>hardwareMap.get(DcMotor.class, "leftFront")</code> works.</p>
 
-    <button onclick="addHardwareRow()">+ Add Component</button>
-    <button onclick="saveHardwareMap()">Save Hardware Map</button>
+    <div class="config-actions">
+      <button onclick="addHardwareRow()">+ Add Component</button>
+      <button onclick="saveHardwareMap()">Save Hardware Map</button>
+    </div>
 
     <div id="hardwareRows"></div>
+
+    <h2>Gamepad Mapping</h2>
+    <p>Click a mapping space, then click a control button below or press a key.</p>
+    <p id="bindingHint"></p>
+    <div id="inputPalette" class="input-palette"></div>
+    <div id="gamepadMappings" class="gamepad-configs"></div>
   </div>
 
   <div id="fieldTab" class="tab">
