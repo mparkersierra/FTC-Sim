@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>FTC Sim Viewer</title>
+  <style>
+    body {
+      margin: 0;
+      background: #111;
+      color: white;
+      font-family: Arial, sans-serif;
+    }
+
+    #info {
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      background: rgba(0,0,0,0.6);
+      padding: 10px;
+      border-radius: 8px;
+    }
+
+    canvas {
+      display: block;
+      background: #2f6f3e;
+    }
+  </style>
+</head>
+<body>
+  <div id="info">Connecting...</div>
+  <canvas id="field"></canvas>
+
+  <script src="./src/main.js"></script>
+</body>
+</html>

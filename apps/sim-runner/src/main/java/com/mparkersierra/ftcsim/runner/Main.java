@@ -11,6 +11,9 @@ import java.util.Scanner;
 
 public class Main {
     public static void main(String[] args) throws Exception {
+        SimWebSocketServer server = new SimWebSocketServer(8080);
+        server.start();
+
         Scanner scanner = new Scanner(System.in);
 
         System.out.println("Select OpMode:");
@@ -47,15 +50,6 @@ public class Main {
         opModeThread.start();
 
         Thread keyboardThread = new Thread(() -> {
-            System.out.println();
-            System.out.println("Keyboard controls:");
-            System.out.println("w = forward");
-            System.out.println("s = backward");
-            System.out.println("a = turn left");
-            System.out.println("d = turn right");
-            System.out.println("x = stop");
-            System.out.println("q = quit");
-            System.out.println("Type a key and press Enter.");
 
             while (opModeThread.isAlive()) {
                 String input = scanner.nextLine().trim().toLowerCase();
@@ -94,44 +88,77 @@ public class Main {
         keyboardThread.setDaemon(true);
         keyboardThread.start();
 
-        double robotX = 0.0;
-        double heading = 0.0;
+        double robotX = 0.0;      // field X, left/right
+        double robotY = 0.0;      // field Y, forward/back
+        double heading = 0.0;     // radians
 
+        long lastTime = System.nanoTime();
         long lastPrint = 0;
 
+        final double MAX_SPEED = 0.1;       // inches per second at full power
+        final double MAX_TURN_SPEED = 0.1;   // radians per second at full turn power
+
         while (opModeThread.isAlive()) {
-            double leftPower =
-                (leftFront.getAppliedPower() + leftBack.getAppliedPower()) / 2.0;
+            long nowNano = System.nanoTime();
+            double dt = (nowNano - lastTime) / 1_000_000_000.0;
+            lastTime = nowNano;
 
-            double rightPower =
-                (rightFront.getAppliedPower() + rightBack.getAppliedPower()) / 2.0;
+            double lf = leftFront.getAppliedPower();
+            double rf = rightFront.getAppliedPower();
+            double lb = leftBack.getAppliedPower();
+            double rb = rightBack.getAppliedPower();
 
-            double forward = (leftPower - rightPower) / 2.0;
-            double turn = -(leftPower + rightPower) / 2.0;
+            /*
+            * Mecanum inverse calculation.
+            *
+            * Assumes your applied powers are:
+            * LF = forward + strafe + turn
+            * RF = forward - strafe - turn
+            * LB = forward - strafe + turn
+            * RB = forward + strafe - turn
+            */
+            double forward = (-lf + rf - lb + rb) / 4.0;
+            double strafe  = (-lf + rf + lb - rb) / 4.0;
+            double turn    = (lf + rf + lb + rb) / 4.0;
 
-            robotX += forward * 0.05;
-            heading += turn * 3.0;
+            // Convert robot-relative movement into field-relative movement
+            double cos = Math.cos(heading);
+            double sin = Math.sin(heading);
+
+            double robotVx = strafe * MAX_SPEED;
+            double robotVy = forward * MAX_SPEED;
+
+            double fieldVx = robotVx * cos - robotVy * sin;
+            double fieldVy = robotVx * sin + robotVy * cos;
+
+            robotX += fieldVx * dt;
+            robotY += fieldVy * dt;
+            heading += turn * MAX_TURN_SPEED * dt;
+
+            // Keep heading between -pi and pi
+            heading = Math.atan2(Math.sin(heading), Math.cos(heading));
 
             long now = System.currentTimeMillis();
 
-            if (now - lastPrint > 5000) {
+            if (now - lastPrint > 2000) {
                 System.out.println(
-                    "LF=" + leftFront.getPower()
-                    + " RF=" + rightFront.getPower()
-                    + " LB=" + leftBack.getPower()
-                    + " RB=" + rightBack.getPower()
-                    + " | appliedL=" + leftPower
-                    + " appliedR=" + rightPower
+                    "LF=" + lf
+                    + " RF=" + rf
+                    + " LB=" + lb
+                    + " RB=" + rb
+                    + " | forward=" + forward
+                    + " strafe=" + strafe
+                    + " turn=" + turn
                     + " | x=" + robotX
-                    + " heading=" + heading
-                    + " dpad_up=" + (opMode.gamepad1.dpad_up)
-                    + " dpad_down=" + (opMode.gamepad1.dpad_down)
+                    + " y=" + robotY
+                    + " headingDeg=" + Math.toDegrees(heading)
                 );
                 lastPrint = now;
+            }
 
-            }  
+            server.broadcastRobotState(robotX, robotY, heading);
 
-            Thread.sleep(100);
+            Thread.sleep(20);
         }
 
         System.out.println("Simulator stopped.");

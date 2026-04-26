@@ -5,6 +5,7 @@ plugins {
 dependencies {
     implementation project(":packages:ftc-sdk-shim")
     implementation project(":vendor:TeamCode")
+    implementation "org.java-websocket:Java-WebSocket:1.5.6"
 }
 
 application {

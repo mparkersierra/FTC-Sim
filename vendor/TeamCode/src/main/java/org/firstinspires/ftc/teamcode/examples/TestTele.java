@@ -37,11 +37,6 @@ public class TestTele extends LinearOpMode {
             leftBack.setPower(leftPower);
             rightFront.setPower(rightPower);
             rightBack.setPower(rightPower);
-
-            telemetry.addData("Drive", drive);
-            telemetry.addData("Turn", turn);
-            telemetry.addData("Left Power", leftPower);
-            telemetry.addData("Right Power", rightPower);
             telemetry.update();
 
             sleep(50);
