@@ -53,7 +53,7 @@ type Binding = {
 
 type ActiveBinding = Binding | null;
 type GamepadMappingConfig = Record<GamepadNumber, Partial<Record<GamepadControl, string>>>;
-type TeamCodeFolder = "examples" | "hardware" | "software";
+type TeamCodeFolder = string;
 
 const FIELD_SCALE = 100;
 const ROBOT_HALF_SIZE = 35;
@@ -66,7 +66,7 @@ const EDITOR_TITLEBAR_HEIGHT = 40;
 const EDITOR_RESIZE_HANDLE_HEIGHT = 12;
 
 const hardwareTypes = ["DcMotor"];
-const teamCodeFolders: TeamCodeFolder[] = ["examples", "hardware", "software"];
+const rootTeamCodeFolder = "(root)";
 
 const gamepadControls: Array<{ id: GamepadControl; label: string }> = [
   { id: "left_stick_up", label: "Left Stick Up" },
@@ -177,12 +177,8 @@ function App() {
   const [codeText, setCodeText] = useState("");
   const [codeStatus, setCodeStatus] = useState("");
   const [isLoadingCodeFile, setIsLoadingCodeFile] = useState(false);
-  const [editorHeight, setEditorHeight] = useState(560);
-  const [expandedTeamCodeFolders, setExpandedTeamCodeFolders] = useState<Record<TeamCodeFolder, boolean>>({
-    examples: true,
-    hardware: true,
-    software: true,
-  });
+  const [editorHeight, setEditorHeight] = useState(740);
+  const [expandedTeamCodeFolders, setExpandedTeamCodeFolders] = useState<Record<TeamCodeFolder, boolean>>({});
 
   useEffect(() => {
     robotRef.current = robot;
@@ -263,7 +259,7 @@ function App() {
         contents: codeText,
       });
 
-      setCodeStatus("Compiled. Restarting sim runner...");
+      setCodeStatus("Saved. Restarting sim runner to compile TeamCode...");
       send({ type: "shutdown" });
       const result = await invoke<string>("restart_sim_runner");
 
@@ -375,16 +371,21 @@ function App() {
     return "INIT";
   }, [simStatus]);
 
-  const teamCodeFilesByFolder = useMemo(
-    () =>
-      teamCodeFolders.reduce<Record<TeamCodeFolder, string[]>>(
-        (groups, folder) => ({
-          ...groups,
-          [folder]: teamCodeFiles.filter((fileName) => fileName.startsWith(`${folder}/`)),
-        }),
-        { examples: [], hardware: [], software: [] },
-      ),
-    [teamCodeFiles],
+  const teamCodeFilesByFolder = useMemo(() => {
+    const groups: Record<TeamCodeFolder, string[]> = {};
+
+    for (const fileName of teamCodeFiles) {
+      const separatorIndex = fileName.indexOf("/");
+      const folder = separatorIndex === -1 ? rootTeamCodeFolder : fileName.slice(0, separatorIndex);
+      groups[folder] = [...(groups[folder] ?? []), fileName];
+    }
+
+    return groups;
+  }, [teamCodeFiles]);
+
+  const teamCodeFolders = useMemo(
+    () => Object.keys(teamCodeFilesByFolder).sort((a, b) => a.localeCompare(b)),
+    [teamCodeFilesByFolder],
   );
 
   const toggleTeamCodeFolder = (folder: TeamCodeFolder) => {
@@ -946,7 +947,7 @@ function App() {
                   <span>{folder}</span>
                 </button>
 
-                {expandedTeamCodeFolders[folder] &&
+                {(expandedTeamCodeFolders[folder] ?? true) &&
                   teamCodeFilesByFolder[folder].map((fileName) => (
                     <button
                       className={`file-item ${codeFileName === fileName ? "active" : ""}`}
@@ -955,7 +956,7 @@ function App() {
                       onClick={() => openCodeFile(fileName)}
                       type="button"
                     >
-                      {fileName.slice(folder.length + 1)}
+                      {folder === rootTeamCodeFolder ? fileName : fileName.slice(folder.length + 1)}
                     </button>
                   ))}
               </div>

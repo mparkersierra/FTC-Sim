@@ -9,18 +9,20 @@ import java.util.List;
 public class OpModeManager {
     private final HardwareMap hardwareMap;
     private final Telemetry telemetry;
+    private final OpModeScanner opModeScanner;
 
     private LinearOpMode currentOpMode;
     private Thread opModeThread;
     private Runnable stopListener;
 
-    public OpModeManager(HardwareMap hardwareMap, Telemetry telemetry) {
+    public OpModeManager(HardwareMap hardwareMap, Telemetry telemetry, OpModeScanner opModeScanner) {
         this.hardwareMap = hardwareMap;
         this.telemetry = telemetry;
+        this.opModeScanner = opModeScanner;
     }
 
     public List<OpModeInfo> getOpModes() {
-        return OpModeScanner.scan();
+        return opModeScanner.scan();
     }
 
     public synchronized LinearOpMode getCurrentOpMode() {

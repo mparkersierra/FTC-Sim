@@ -31,6 +31,15 @@ pnpm-debug.log*
 *.swo
 *~
 
+# Local app runtime / editable workspace
+runtime/
+workspace/
+
+# Release packaging artifacts
+dmg-staging/
+*.dmg
+*.app/
+
 # Environment / local configuration
 .env
 .env.*

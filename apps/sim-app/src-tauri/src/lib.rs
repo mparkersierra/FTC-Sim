@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::{
+    env,
     fs,
     net::{TcpListener, TcpStream},
     path::{Component, Path, PathBuf},
@@ -16,8 +17,8 @@ const SIM_RUNNER_PORT: u16 = 8080;
 const PORT_RELEASE_TIMEOUT: Duration = Duration::from_secs(10);
 const PORT_RELEASE_POLL_INTERVAL: Duration = Duration::from_millis(100);
 const RUNNER_START_TIMEOUT: Duration = Duration::from_secs(5);
-const TEAMCODE_RELATIVE_ROOT: &str = "vendor/TeamCode/src/main/java/org/firstinspires/ftc/teamcode";
-const TEAMCODE_EDITOR_FOLDERS: [&str; 3] = ["examples", "hardware", "software"];
+const TEAMCODE_WORKSPACE_RELATIVE_ROOT: &str = "workspace/TeamCode";
+const TEAMCODE_SOURCE_RELATIVE_ROOT: &str = "src/main/java/org/firstinspires/ftc/teamcode";
 
 /// Get repo root (go up from src-tauri)
 fn repo_root() -> PathBuf {
@@ -28,7 +29,83 @@ fn repo_root() -> PathBuf {
 }
 
 fn teamcode_root() -> PathBuf {
-    repo_root().join(TEAMCODE_RELATIVE_ROOT)
+    teamcode_workspace_root().join(TEAMCODE_SOURCE_RELATIVE_ROOT)
+}
+
+fn app_root() -> PathBuf {
+    if cfg!(debug_assertions) {
+        return repo_root();
+    }
+
+    env::current_exe()
+        .ok()
+        .and_then(|path| path.parent().map(Path::to_path_buf))
+        .unwrap_or_else(|| env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
+}
+
+fn teamcode_workspace_root() -> PathBuf {
+    app_root().join(TEAMCODE_WORKSPACE_RELATIVE_ROOT)
+}
+
+fn ensure_teamcode_workspace() -> Result<(), String> {
+    fs::create_dir_all(teamcode_root()).map_err(|e| e.to_string())
+}
+
+fn java_binary_name() -> &'static str {
+    if cfg!(target_os = "windows") {
+        "java.exe"
+    } else {
+        "java"
+    }
+}
+
+fn is_usable_java_home(java_home: &Path) -> bool {
+    let java = java_home.join("bin").join(java_binary_name());
+    if !java.exists() {
+        return false;
+    }
+
+    if cfg!(target_os = "macos") {
+        return java_home.join("lib").join("libjli.dylib").exists();
+    }
+
+    true
+}
+
+fn java_home_candidates(root: &Path) -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+
+    candidates.push(root.join("runtime"));
+    candidates.push(root.join("runtime").join("Contents").join("Home"));
+
+    for parent in [root.join("runtime"), root.join("runtime").join("bin")] {
+        let Ok(entries) = fs::read_dir(parent) else {
+            continue;
+        };
+
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().is_some_and(|extension| extension == "jdk") {
+                candidates.push(path.join("Contents").join("Home"));
+            }
+        }
+    }
+
+    if let Some(java_home) = env::var_os("JAVA_HOME") {
+        candidates.push(PathBuf::from(java_home));
+    }
+
+    candidates
+}
+
+fn java_executable(root: &Path) -> PathBuf {
+    for java_home in java_home_candidates(root) {
+        if is_usable_java_home(&java_home) {
+            return java_home.join("bin").join(java_binary_name());
+        }
+    }
+
+    PathBuf::from(java_binary_name())
 }
 
 fn validate_teamcode_java_path(relative_path: &str) -> Result<PathBuf, String> {
@@ -43,19 +120,6 @@ fn validate_teamcode_java_path(relative_path: &str) -> Result<PathBuf, String> {
             .any(|component| !matches!(component, Component::Normal(_)))
     {
         return Err("Invalid file path".into());
-    }
-
-    let first_component = relative_path
-        .components()
-        .next()
-        .and_then(|component| match component {
-            Component::Normal(value) => value.to_str(),
-            _ => None,
-        })
-        .ok_or_else(|| "Invalid file path".to_string())?;
-
-    if !TEAMCODE_EDITOR_FOLDERS.contains(&first_component) {
-        return Err("File must be in examples, hardware, or software".into());
     }
 
     Ok(relative_path)
@@ -147,13 +211,50 @@ fn kill_runner(child: &mut Child) -> Result<(), String> {
     }
 }
 
-fn spawn_sim_runner(root: &PathBuf) -> Result<Child, String> {
+fn runner_log_stdio() -> Result<(Stdio, Stdio), String> {
+    let log_path = app_root().join("workspace").join("runner.log");
+    if let Some(parent) = log_path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+
+    let log_file = fs::File::create(log_path).map_err(|e| e.to_string())?;
+    let err_file = log_file.try_clone().map_err(|e| e.to_string())?;
+
+    Ok((Stdio::from(log_file), Stdio::from(err_file)))
+}
+
+fn spawn_sim_runner(root: &Path) -> Result<Child, String> {
+    ensure_teamcode_workspace()?;
+
+    let teamcode_root = teamcode_workspace_root();
+    let (stdout, stderr) = runner_log_stdio()?;
+    let runner_jar = root
+        .join("apps")
+        .join("sim-runner")
+        .join("build")
+        .join("libs")
+        .join("sim-runner-1.0.0.jar");
+
+    if runner_jar.exists() {
+        return Command::new(java_executable(root))
+            .arg("-jar")
+            .arg(runner_jar)
+            .arg("--teamcode-root")
+            .arg(teamcode_root)
+            .stdin(Stdio::null())
+            .stdout(stdout)
+            .stderr(stderr)
+            .spawn()
+            .map_err(|e| e.to_string());
+    }
+
     Command::new("./gradlew")
         .arg(":apps:sim-runner:run")
+        .arg(format!("--args=--teamcode-root {}", teamcode_root.to_string_lossy()))
         .current_dir(root)
         .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
+        .stdout(stdout)
+        .stderr(stderr)
         .spawn()
         .map_err(|e| e.to_string())
 }
@@ -221,10 +322,9 @@ fn start_sim_runner_background(force_restart: bool) {
 #[tauri::command]
 fn save_teamcode_file(relative_path: String, contents: String) -> Result<String, String> {
     let relative_path = validate_teamcode_java_path(&relative_path)?;
-    let root = repo_root();
+    ensure_teamcode_workspace()?;
 
-    // Target: TeamCode source folder
-    let file_path = root.join(TEAMCODE_RELATIVE_ROOT).join(&relative_path);
+    let file_path = teamcode_root().join(&relative_path);
 
     // Ensure directories exist
     if let Some(parent) = file_path.parent() {
@@ -234,36 +334,16 @@ fn save_teamcode_file(relative_path: String, contents: String) -> Result<String,
     // Write file
     fs::write(&file_path, contents).map_err(|e| e.to_string())?;
 
-    println!("Saved file: {:?}", file_path);
-
-    // Compile TeamCode only
-    let output = Command::new("./gradlew")
-        .arg(":vendor:TeamCode:classes")
-        .current_dir(&root)
-        .output()
-        .map_err(|e| e.to_string())?;
-
-    if !output.status.success() {
-        return Err(format!(
-            "Compilation failed:\n{}{}",
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr)
-        ));
-    }
-
-    println!("Compilation successful");
-
-    Ok("Saved and compiled successfully".into())
+    Ok("Saved successfully".into())
 }
 
 #[tauri::command]
 fn list_teamcode_files() -> Result<Vec<String>, String> {
+    ensure_teamcode_workspace()?;
     let base_dir = teamcode_root();
     let mut files = Vec::new();
 
-    for folder in TEAMCODE_EDITOR_FOLDERS {
-        collect_teamcode_files(&base_dir, &base_dir.join(folder), &mut files)?;
-    }
+    collect_teamcode_files(&base_dir, &base_dir, &mut files)?;
 
     files.sort();
     Ok(files)

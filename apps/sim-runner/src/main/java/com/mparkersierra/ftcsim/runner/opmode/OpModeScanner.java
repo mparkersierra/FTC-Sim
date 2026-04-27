@@ -4,28 +4,59 @@ import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
 import java.io.File;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
 public class OpModeScanner {
     private static final String BASE_PACKAGE = "org.firstinspires.ftc.teamcode";
-    private static final String BASE_PATH = "vendor/TeamCode/build/classes/java/main/org/firstinspires/ftc/teamcode";
 
-    public static List<OpModeInfo> scan() {
+    private final Path classOutputRoot;
+    private URLClassLoader classLoader;
+
+    public OpModeScanner(Path classOutputRoot) {
+        this.classOutputRoot = classOutputRoot.toAbsolutePath().normalize();
+    }
+
+    public List<OpModeInfo> scan() {
         List<OpModeInfo> results = new ArrayList<>();
 
-        File root = new File(BASE_PATH);
+        File root = classOutputRoot
+            .resolve("org")
+            .resolve("firstinspires")
+            .resolve("ftc")
+            .resolve("teamcode")
+            .toFile();
 
         if (!root.exists()) {
             System.out.println("TeamCode classes folder not found: " + root.getAbsolutePath());
             return results;
         }
 
-        scanDirectory(root, BASE_PACKAGE, results);
+        try {
+            refreshClassLoader();
+            scanDirectory(root, BASE_PACKAGE, results);
+        } catch (Exception error) {
+            error.printStackTrace();
+        }
+
         return results;
     }
 
-    private static void scanDirectory(File dir, String packageName, List<OpModeInfo> results) {
+    private void refreshClassLoader() throws Exception {
+        if (classLoader != null) {
+            classLoader.close();
+        }
+
+        classLoader = new URLClassLoader(
+            new URL[] { classOutputRoot.toUri().toURL() },
+            OpModeScanner.class.getClassLoader()
+        );
+    }
+
+    private void scanDirectory(File dir, String packageName, List<OpModeInfo> results) {
         File[] files = dir.listFiles();
         if (files == null) return;
 
@@ -39,9 +70,9 @@ public class OpModeScanner {
         }
     }
 
-    private static void inspectClass(String className, List<OpModeInfo> results) {
+    private void inspectClass(String className, List<OpModeInfo> results) {
         try {
-            Class<?> clazz = Class.forName(className);
+            Class<?> clazz = Class.forName(className, true, classLoader);
 
             TeleOp teleOp = clazz.getAnnotation(TeleOp.class);
             Autonomous autonomous = clazz.getAnnotation(Autonomous.class);

@@ -4,7 +4,7 @@ plugins {
 
 dependencies {
     implementation project(":packages:ftc-sdk-shim")
-    implementation project(":vendor:TeamCode")
+    implementation project(":packages:sim-core")
     implementation "org.java-websocket:Java-WebSocket:1.5.6"
 }
 
@@ -15,4 +15,18 @@ application {
 run {
     standardInput = System.in
     workingDir = rootProject.projectDir
+}
+
+jar {
+    dependsOn configurations.runtimeClasspath
+
+    manifest {
+        attributes "Main-Class": application.mainClass.get()
+    }
+
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
 }

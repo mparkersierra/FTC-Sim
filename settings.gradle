@@ -15,5 +15,6 @@ dependencyResolutionManagement {
 rootProject.name = "mparkersierra-ftc-sim"
 
 include ":packages:ftc-sdk-shim"
+include ":packages:sim-core"
 include ":apps:sim-runner"
 include ":vendor:TeamCode"
