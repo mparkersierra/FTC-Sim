@@ -31,6 +31,11 @@ button:hover {
   background: #444;
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 button.active {
   background: #555;
 }
@@ -157,4 +162,109 @@ h2 {
 .binding-hint {
   min-height: 20px;
   color: #f7d84a;
+}
+
+.ide-shell {
+  display: grid;
+  grid-template-columns: minmax(210px, 260px) minmax(0, 1fr);
+  min-height: 372px;
+  border: 1px solid #333;
+  background: #151515;
+}
+
+.file-browser {
+  overflow: auto;
+  border-right: 1px solid #333;
+  background: #1b1b1b;
+}
+
+.file-browser-title {
+  padding: 12px;
+  border-bottom: 1px solid #333;
+  color: #ddd;
+  font-weight: bold;
+}
+
+.file-group {
+  padding: 10px 8px;
+}
+
+.file-group-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin-bottom: 6px;
+  margin-right: 0;
+  padding: 5px 6px;
+  background: transparent;
+  color: #999;
+  font-size: 12px;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.file-group-title:hover {
+  background: #242424;
+}
+
+.file-item {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 7px 10px;
+  background: transparent;
+  color: #ddd;
+  text-align: left;
+}
+
+.file-item:hover,
+.file-item.active {
+  background: #2f3b4a;
+}
+
+.editor-pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  background: #1e1e1e;
+}
+
+.editor-titlebar {
+  display: flex;
+  align-items: center;
+  height: 40px;
+  padding: 0 12px;
+  border-bottom: 1px solid #333;
+  color: #ccc;
+  font-size: 13px;
+}
+
+.editor-resize-handle {
+  height: 12px;
+  border-top: 1px solid #333;
+  background:
+    linear-gradient(to bottom, transparent 0, transparent 4px, #555 4px, #555 5px, transparent 5px),
+    #1a1a1a;
+  cursor: row-resize;
+}
+
+.editor-resize-handle:hover {
+  background:
+    linear-gradient(to bottom, transparent 0, transparent 4px, #888 4px, #888 5px, transparent 5px),
+    #222;
+}
+
+@media (max-width: 760px) {
+  .ide-shell {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .file-browser {
+    max-height: 220px;
+    border-right: 0;
+    border-bottom: 1px solid #333;
+  }
 }

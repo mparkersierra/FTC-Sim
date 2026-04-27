@@ -63,7 +63,25 @@ public class SimWebSocketServer extends WebSocketServer {
             robotPose.heading = extractDouble(message, "heading");
         } else if (message.contains("\"type\":\"setHardwareMap\"")) {
             updateHardwareMap(message);
+        } else if (message.contains("\"type\":\"shutdown\"")) {
+            shutdownRunner();
         }
+    }
+
+    private void shutdownRunner() {
+        opModeManager.stop();
+
+        Thread shutdownThread = new Thread(() -> {
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+            }
+
+            System.exit(0);
+        });
+        shutdownThread.setDaemon(false);
+        shutdownThread.start();
     }
 
     private void sendOpModes(WebSocket conn) {

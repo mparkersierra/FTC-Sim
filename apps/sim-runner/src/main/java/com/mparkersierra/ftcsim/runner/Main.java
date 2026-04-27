@@ -23,7 +23,8 @@ public class Main {
 
         SimWebSocketServer server =
             new SimWebSocketServer(8080, opModeManager, robotPose, hardwareRegistry);
-
+            
+        server.setReuseAddr(true); 
         server.start();
 
         new DrivetrainSimulation(hardwareRegistry, robotPose, server::broadcastRobotState).run();

@@ -4,48 +4,26 @@ import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
 
-
-@TeleOp(name="Test TeleOp", group="Test")
+@TeleOp(name = "New Test Tele", group = "Sim")
 public class TestTele extends LinearOpMode {
-    private DcMotor leftFront;
-    private DcMotor rightFront;
-    private DcMotor leftBack;
-    private DcMotor rightBack;
-
     @Override
     public void runOpMode() {
-
-        leftFront = hardwareMap.get(DcMotor.class, "leftFront");
-        rightFront = hardwareMap.get(DcMotor.class, "rightFront");
-        leftBack = hardwareMap.get(DcMotor.class, "leftBack");
-        rightBack = hardwareMap.get(DcMotor.class, "rightBack");
-
-        leftFront.setDirection(DcMotor.Direction.REVERSE);
-        leftBack.setDirection(DcMotor.Direction.REVERSE);
-
-        telemetry.addData("Status", "Initialized");
-        telemetry.update(); 
+        DcMotor leftFront = hardwareMap.get(DcMotor.class, "leftFront");
+        DcMotor rightFront = hardwareMap.get(DcMotor.class, "rightFront");
+        DcMotor leftBack = hardwareMap.get(DcMotor.class, "leftBack");
+        DcMotor rightBack = hardwareMap.get(DcMotor.class, "rightBack");
 
         waitForStart();
 
         while (opModeIsActive()) {
+            double y = gamepad1.left_stick_y;
+            double x = gamepad1.left_stick_x;
+            double turn = gamepad1.right_stick_x;
 
-            if (gamepad1.left_stick_y < -0.5) {
-                setDrivePower(0.5);
-            } else if (gamepad1.left_stick_y > 0.5) {
-                setDrivePower(-0.5);
-            } else {
-                setDrivePower(0);
-            }
+            leftFront.setPower(-y + x + turn);
+            rightFront.setPower(y + x + turn);
+            leftBack.setPower(-y - x + turn);
+            rightBack.setPower(y - x + turn);
         }
-
     }
-    private void setDrivePower(double power) {
-
-        leftFront.setPower(power);
-        rightFront.setPower(power);
-        leftBack.setPower(power);
-        rightBack.setPower(power);
-    }
-    
 }

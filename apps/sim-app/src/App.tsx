@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import Editor from "@monaco-editor/react";
 import "./App.css";
 
-type TabId = "driverStation" | "configuration" | "field";
+type TabId = "driverStation" | "configuration" | "onbotJava" | "field";
 type SimStatus = "stopped" | "initialized" | "running";
 
 type RobotState = {
@@ -51,14 +53,20 @@ type Binding = {
 
 type ActiveBinding = Binding | null;
 type GamepadMappingConfig = Record<GamepadNumber, Partial<Record<GamepadControl, string>>>;
+type TeamCodeFolder = "examples" | "hardware" | "software";
 
 const FIELD_SCALE = 100;
 const ROBOT_HALF_SIZE = 35;
 const ROTATION_HANDLE_LENGTH = 70;
 const ROTATION_HANDLE_RADIUS = 9;
 const TOP_BAR_HEIGHT = 42;
+const MIN_EDITOR_HEIGHT = 320;
+const MAX_EDITOR_HEIGHT = 1200;
+const EDITOR_TITLEBAR_HEIGHT = 40;
+const EDITOR_RESIZE_HANDLE_HEIGHT = 12;
 
 const hardwareTypes = ["DcMotor"];
+const teamCodeFolders: TeamCodeFolder[] = ["examples", "hardware", "software"];
 
 const gamepadControls: Array<{ id: GamepadControl; label: string }> = [
   { id: "left_stick_up", label: "Left Stick Up" },
@@ -140,6 +148,7 @@ function App() {
   const robotRef = useRef<RobotState>({ x: 0, y: 0, heading: 0 });
   const hardwareMapRef = useRef<HardwareDevice[]>(defaultHardwareMap);
   const simStatusRef = useRef<SimStatus>("stopped");
+  const activeTabRef = useRef<TabId>("driverStation");
   const activeBindingRef = useRef<ActiveBinding>(null);
   const mappingRef = useRef<GamepadMappingConfig>(defaultGamepadMapping);
   const pressedBindingsRef = useRef<Map<string, Binding>>(new Map());
@@ -163,9 +172,25 @@ function App() {
   const [bindingHint, setBindingHint] = useState("");
   const [robot, setRobot] = useState<RobotState>(robotRef.current);
 
+  const [teamCodeFiles, setTeamCodeFiles] = useState<string[]>([]);
+  const [codeFileName, setCodeFileName] = useState("");
+  const [codeText, setCodeText] = useState("");
+  const [codeStatus, setCodeStatus] = useState("");
+  const [isLoadingCodeFile, setIsLoadingCodeFile] = useState(false);
+  const [editorHeight, setEditorHeight] = useState(560);
+  const [expandedTeamCodeFolders, setExpandedTeamCodeFolders] = useState<Record<TeamCodeFolder, boolean>>({
+    examples: true,
+    hardware: true,
+    software: true,
+  });
+
   useEffect(() => {
     robotRef.current = robot;
   }, [robot]);
+
+  useEffect(() => {
+    activeTabRef.current = activeTab;
+  }, [activeTab]);
 
   useEffect(() => {
     hardwareMapRef.current = hardwareMapConfig;
@@ -194,6 +219,63 @@ function App() {
     send({ type: "getOpModes" });
   }, [send]);
 
+  const loadTeamCodeFiles = useCallback(async () => {
+    try {
+      const files = await invoke<string[]>("list_teamcode_files");
+      setTeamCodeFiles(files);
+    } catch (error) {
+      setCodeStatus(String(error));
+    }
+  }, []);
+
+  const openCodeFile = async (fileName: string) => {
+    try {
+      setIsLoadingCodeFile(true);
+      setCodeStatus(`Opening ${fileName}...`);
+      const contents = await invoke<string>("read_teamcode_file", {
+        relativePath: fileName,
+      });
+
+      setCodeFileName(fileName);
+      setCodeText(contents);
+      setCodeStatus("");
+    } catch (error) {
+      setCodeStatus(String(error));
+    } finally {
+      setIsLoadingCodeFile(false);
+    }
+  };
+
+  useEffect(() => {
+    loadTeamCodeFiles();
+  }, [loadTeamCodeFiles]);
+
+  const saveCodeFile = async () => {
+    if (!codeFileName) {
+      setCodeStatus("Select a Java file before saving");
+      return;
+    }
+
+    try {
+      setCodeStatus("Saving and compiling...");
+      await invoke<string>("save_teamcode_file", {
+        relativePath: codeFileName,
+        contents: codeText,
+      });
+
+      setCodeStatus("Compiled. Restarting sim runner...");
+      send({ type: "shutdown" });
+      const result = await invoke<string>("restart_sim_runner");
+
+      setCodeStatus(`${result}. Reconnecting...`);
+      setStatusText("Restarting sim runner");
+      setInfoText("Restarting sim runner");
+      loadTeamCodeFiles();
+    } catch (error) {
+      setCodeStatus(String(error));
+    }
+  };
+
   const saveHardwareMap = useCallback(() => {
     const cleaned = hardwareMapRef.current
       .map((item) => ({
@@ -211,47 +293,74 @@ function App() {
   }, [send]);
 
   useEffect(() => {
-    const socket = new WebSocket("ws://localhost:8080");
-    socketRef.current = socket;
+    let disposed = false;
+    let reconnectTimer: number | undefined;
 
-    socket.onopen = () => {
-      setStatusText("Connected");
-      setInfoText("Connected");
-      requestOpModes();
-      saveHardwareMap();
-    };
+    const connect = (delayMs = 0) => {
+      window.clearTimeout(reconnectTimer);
 
-    socket.onmessage = (event) => {
-      const msg = JSON.parse(event.data);
+      reconnectTimer = window.setTimeout(() => {
+        if (disposed) return;
 
-      if (msg.type === "opModes") {
-        setOpModes(msg.items);
-        setSelectedOpModeId((current) => current || msg.items[0]?.id || "");
-      }
+        const socket = new WebSocket("ws://localhost:8080");
+        socketRef.current = socket;
 
-      if (msg.type === "robotState") {
-        const nextRobot = {
-          x: Number(msg.x),
-          y: Number(msg.y),
-          heading: Number(msg.heading),
+        socket.onopen = () => {
+          setStatusText("Connected");
+          setInfoText("Connected");
+          setCodeStatus((current) => (current.endsWith("Reconnecting...") ? "Hot reload complete" : current));
+          requestOpModes();
+          saveHardwareMap();
         };
-        robotRef.current = nextRobot;
-        setRobot(nextRobot);
-      }
 
-      if (msg.type === "opModeStopped") {
-        setSimStatus("stopped");
-        setStatusText("Stopped");
-      }
+        socket.onmessage = (event) => {
+          const msg = JSON.parse(event.data);
+
+          if (msg.type === "opModes") {
+            setOpModes(msg.items);
+            setSelectedOpModeId((current) => current || msg.items[0]?.id || "");
+          }
+
+          if (msg.type === "robotState") {
+            const nextRobot = {
+              x: Number(msg.x),
+              y: Number(msg.y),
+              heading: Number(msg.heading),
+            };
+            robotRef.current = nextRobot;
+            setRobot(nextRobot);
+          }
+
+          if (msg.type === "opModeStopped") {
+            setSimStatus("stopped");
+            setStatusText("Stopped");
+          }
+        };
+
+        socket.onclose = () => {
+          if (socketRef.current === socket) {
+            socketRef.current = null;
+          }
+
+          if (!disposed) {
+            setStatusText("Disconnected. Reconnecting...");
+            setInfoText("Disconnected. Reconnecting...");
+            connect(750);
+          }
+        };
+
+        socket.onerror = () => {
+          socket.close();
+        };
+      }, delayMs);
     };
 
-    socket.onclose = () => {
-      setStatusText("Disconnected");
-      setInfoText("Disconnected");
-    };
+    connect();
 
     return () => {
-      socket.close();
+      disposed = true;
+      window.clearTimeout(reconnectTimer);
+      socketRef.current?.close();
       socketRef.current = null;
     };
   }, [requestOpModes, saveHardwareMap]);
@@ -265,6 +374,49 @@ function App() {
     if (simStatus === "running") return "STOP";
     return "INIT";
   }, [simStatus]);
+
+  const teamCodeFilesByFolder = useMemo(
+    () =>
+      teamCodeFolders.reduce<Record<TeamCodeFolder, string[]>>(
+        (groups, folder) => ({
+          ...groups,
+          [folder]: teamCodeFiles.filter((fileName) => fileName.startsWith(`${folder}/`)),
+        }),
+        { examples: [], hardware: [], software: [] },
+      ),
+    [teamCodeFiles],
+  );
+
+  const toggleTeamCodeFolder = (folder: TeamCodeFolder) => {
+    setExpandedTeamCodeFolders((current) => ({
+      ...current,
+      [folder]: !current[folder],
+    }));
+  };
+
+  const startEditorResize = (event: ReactPointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+
+    const startY = event.clientY;
+    const startHeight = editorHeight;
+
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      const nextHeight = startHeight + moveEvent.clientY - startY;
+      setEditorHeight(Math.max(MIN_EDITOR_HEIGHT, Math.min(MAX_EDITOR_HEIGHT, nextHeight)));
+    };
+
+    const onPointerUp = () => {
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+
+    document.body.style.cursor = "row-resize";
+    document.body.style.userSelect = "none";
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+  };
 
   const initOpMode = () => {
     saveHardwareMap();
@@ -381,6 +533,19 @@ function App() {
     [send],
   );
 
+  const releasePressedBindings = useCallback(() => {
+    pressedBindingsRef.current.forEach((binding) => {
+      sendBinding(binding, false);
+    });
+    pressedBindingsRef.current.clear();
+  }, [sendBinding]);
+
+  useEffect(() => {
+    if (activeTab !== "field") {
+      releasePressedBindings();
+    }
+  }, [activeTab, releasePressedBindings]);
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const key = event.key.toLowerCase();
@@ -390,6 +555,8 @@ function App() {
         assignBinding(key);
         return;
       }
+
+      if (activeTabRef.current !== "field") return;
 
       const bindings = bindingsForKey(key);
       if (bindings.length === 0) return;
@@ -407,6 +574,8 @@ function App() {
 
     const onKeyUp = (event: KeyboardEvent) => {
       const key = event.key.toLowerCase();
+      if (activeTabRef.current !== "field") return;
+
       const bindings = bindingsForKey(key);
       if (bindings.length === 0) return;
 
@@ -445,244 +614,175 @@ function App() {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    const context = canvas.getContext("2d");
+    if (!context) return;
+
+    const getCanvasPoint = (event: PointerEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top,
+      };
+    };
+
+    const robotScreenPosition = (state: RobotState) => ({
+      x: canvas.width / 2 + state.x * FIELD_SCALE,
+      y: canvas.height / 2 - state.y * FIELD_SCALE,
+    });
+
+    const rotationHandlePosition = (state: RobotState) => {
+      const position = robotScreenPosition(state);
+      return {
+        x: position.x - Math.sin(state.heading) * ROTATION_HANDLE_LENGTH,
+        y: position.y - Math.cos(state.heading) * ROTATION_HANDLE_LENGTH,
+      };
+    };
+
+    const draw = () => {
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      context.fillStyle = "#2f6f3e";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+
+      context.strokeStyle = "rgba(255, 255, 255, 0.18)";
+      context.lineWidth = 1;
+      for (let x = canvas.width / 2 % FIELD_SCALE; x < canvas.width; x += FIELD_SCALE) {
+        context.beginPath();
+        context.moveTo(x, 0);
+        context.lineTo(x, canvas.height);
+        context.stroke();
+      }
+      for (let y = canvas.height / 2 % FIELD_SCALE; y < canvas.height; y += FIELD_SCALE) {
+        context.beginPath();
+        context.moveTo(0, y);
+        context.lineTo(canvas.width, y);
+        context.stroke();
+      }
+
+      const state = robotRef.current;
+      const position = robotScreenPosition(state);
+      const handle = rotationHandlePosition(state);
+
+      context.save();
+      context.translate(position.x, position.y);
+      context.rotate(-state.heading);
+      context.fillStyle = "#d7dce2";
+      context.strokeStyle = "#111";
+      context.lineWidth = 3;
+      context.fillRect(-ROBOT_HALF_SIZE, -ROBOT_HALF_SIZE, ROBOT_HALF_SIZE * 2, ROBOT_HALF_SIZE * 2);
+      context.strokeRect(-ROBOT_HALF_SIZE, -ROBOT_HALF_SIZE, ROBOT_HALF_SIZE * 2, ROBOT_HALF_SIZE * 2);
+      context.fillStyle = "#e64b3c";
+      context.fillRect(-10, -ROBOT_HALF_SIZE, 20, 15);
+      context.restore();
+
+      context.strokeStyle = "#f7d84a";
+      context.lineWidth = 2;
+      context.beginPath();
+      context.moveTo(position.x, position.y);
+      context.lineTo(handle.x, handle.y);
+      context.stroke();
+
+      context.fillStyle = "#f7d84a";
+      context.beginPath();
+      context.arc(handle.x, handle.y, ROTATION_HANDLE_RADIUS, 0, Math.PI * 2);
+      context.fill();
+    };
 
     const resize = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight - TOP_BAR_HEIGHT;
+      draw();
     };
 
-    resize();
-    window.addEventListener("resize", resize);
+    const onPointerDown = (event: PointerEvent) => {
+      if (activeTabRef.current !== "field" || simStatusRef.current !== "stopped") return;
 
-    return () => window.removeEventListener("resize", resize);
-  }, []);
+      const point = getCanvasPoint(event);
+      const state = robotRef.current;
+      const position = robotScreenPosition(state);
+      const handle = rotationHandlePosition(state);
+      const handleDistance = Math.hypot(point.x - handle.x, point.y - handle.y);
+      const robotDistanceX = Math.abs(point.x - position.x);
+      const robotDistanceY = Math.abs(point.y - position.y);
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext("2d");
-    if (!canvas || !ctx) return;
-
-    let frameId = 0;
-
-    const robotScreenPosition = () => ({
-      x: canvas.width / 2 + robotRef.current.x * FIELD_SCALE,
-      y: canvas.height / 2 - robotRef.current.y * FIELD_SCALE,
-    });
-
-    const rotationHandlePosition = () => {
-      const pos = robotScreenPosition();
-      const distance = ROBOT_HALF_SIZE + ROTATION_HANDLE_LENGTH;
-
-      return {
-        x: pos.x - Math.sin(robotRef.current.heading) * distance,
-        y: pos.y - Math.cos(robotRef.current.heading) * distance,
-      };
-    };
-
-    const robotFrontPosition = () => {
-      const pos = robotScreenPosition();
-
-      return {
-        x: pos.x - Math.sin(robotRef.current.heading) * ROBOT_HALF_SIZE,
-        y: pos.y - Math.cos(robotRef.current.heading) * ROBOT_HALF_SIZE,
-      };
-    };
-
-    const drawField = () => {
-      ctx.fillStyle = "#2f6f3e";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      ctx.strokeStyle = "rgba(255,255,255,0.25)";
-      ctx.lineWidth = 2;
-
-      for (let x = 0; x < canvas.width; x += 40) {
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, canvas.height);
-        ctx.stroke();
-      }
-
-      for (let y = 0; y < canvas.height; y += 40) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(canvas.width, y);
-        ctx.stroke();
-      }
-    };
-
-    const drawRotationHandle = () => {
-      const handle = rotationHandlePosition();
-      const front = robotFrontPosition();
-
-      ctx.save();
-      ctx.strokeStyle = "#f7d84a";
-      ctx.fillStyle = "#f7d84a";
-      ctx.lineWidth = 3;
-      ctx.lineCap = "round";
-
-      ctx.beginPath();
-      ctx.moveTo(front.x, front.y);
-      ctx.lineTo(handle.x, handle.y);
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.arc(handle.x, handle.y, ROTATION_HANDLE_RADIUS, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    };
-
-    const drawRobot = () => {
-      const screenX = canvas.width / 2 + robotRef.current.x * FIELD_SCALE;
-      const screenY = canvas.height / 2 - robotRef.current.y * FIELD_SCALE;
-
-      if (simStatusRef.current === "stopped") {
-        drawRotationHandle();
-      }
-
-      ctx.save();
-      ctx.translate(screenX, screenY);
-      ctx.rotate(-robotRef.current.heading);
-
-      ctx.fillStyle = "#ddd";
-      ctx.fillRect(-ROBOT_HALF_SIZE, -ROBOT_HALF_SIZE, ROBOT_HALF_SIZE * 2, ROBOT_HALF_SIZE * 2);
-
-      ctx.fillStyle = "#ff4444";
-      ctx.fillRect(-10, -ROBOT_HALF_SIZE, 20, 15);
-
-      ctx.restore();
-    };
-
-    const draw = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      drawField();
-      drawRobot();
-
-      setInfoText(
-        `x=${robotRef.current.x.toFixed(2)} y=${robotRef.current.y.toFixed(2)} heading=${(
-          (robotRef.current.heading * 180) /
-          Math.PI
-        ).toFixed(1)}`,
-      );
-
-      frameId = requestAnimationFrame(draw);
-    };
-
-    draw();
-
-    return () => cancelAnimationFrame(frameId);
-  }, []);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const robotScreenPosition = () => ({
-      x: canvas.width / 2 + robotRef.current.x * FIELD_SCALE,
-      y: canvas.height / 2 - robotRef.current.y * FIELD_SCALE,
-    });
-
-    const screenToWorld = (screenX: number, screenY: number) => ({
-      x: (screenX - canvas.width / 2) / FIELD_SCALE,
-      y: -(screenY - canvas.height / 2) / FIELD_SCALE,
-    });
-
-    const isMouseOnRobot = (mouseX: number, mouseY: number) => {
-      const pos = robotScreenPosition();
-      return Math.abs(mouseX - pos.x) < 45 && Math.abs(mouseY - pos.y) < 45;
-    };
-
-    const rotationHandlePosition = () => {
-      const pos = robotScreenPosition();
-      const distance = ROBOT_HALF_SIZE + ROTATION_HANDLE_LENGTH;
-
-      return {
-        x: pos.x - Math.sin(robotRef.current.heading) * distance,
-        y: pos.y - Math.cos(robotRef.current.heading) * distance,
-      };
-    };
-
-    const isMouseOnRotationHandle = (mouseX: number, mouseY: number) => {
-      const handle = rotationHandlePosition();
-      return Math.hypot(mouseX - handle.x, mouseY - handle.y) <= ROTATION_HANDLE_RADIUS + 6;
-    };
-
-    const onMouseDown = (event: MouseEvent) => {
-      if (simStatusRef.current !== "stopped") return;
-
-      const rect = canvas.getBoundingClientRect();
-      const mouseX = event.clientX - rect.left;
-      const mouseY = event.clientY - rect.top;
-
-      if (isMouseOnRotationHandle(mouseX, mouseY) || (event.shiftKey && isMouseOnRobot(mouseX, mouseY))) {
+      if (handleDistance <= ROTATION_HANDLE_RADIUS + 8) {
         dragStateRef.current.rotatingRobot = true;
-      } else if (isMouseOnRobot(mouseX, mouseY)) {
-        const pos = robotScreenPosition();
-        dragStateRef.current.draggingRobot = true;
-        dragStateRef.current.dragOffsetX = mouseX - pos.x;
-        dragStateRef.current.dragOffsetY = mouseY - pos.y;
-      }
-    };
-
-    const onMouseMove = (event: MouseEvent) => {
-      const rect = canvas.getBoundingClientRect();
-      const mouseX = event.clientX - rect.left;
-      const mouseY = event.clientY - rect.top;
-
-      if (simStatusRef.current !== "stopped") {
-        canvas.style.cursor = "";
+        canvas.setPointerCapture(event.pointerId);
         return;
       }
 
-      if (dragStateRef.current.draggingRobot) {
-        const world = screenToWorld(
-          mouseX - dragStateRef.current.dragOffsetX,
-          mouseY - dragStateRef.current.dragOffsetY,
-        );
-        const nextRobot = { ...robotRef.current, x: world.x, y: world.y };
-        robotRef.current = nextRobot;
-        setRobot(nextRobot);
-        sendPose(nextRobot);
-      }
-
-      if (dragStateRef.current.rotatingRobot) {
-        const pos = robotScreenPosition();
-        const angle = Math.atan2(mouseY - pos.y, mouseX - pos.x);
-        const nextRobot = { ...robotRef.current, heading: -(angle + Math.PI / 2) };
-        robotRef.current = nextRobot;
-        setRobot(nextRobot);
-        sendPose(nextRobot);
-      }
-
-      if (dragStateRef.current.draggingRobot || dragStateRef.current.rotatingRobot) {
-        canvas.style.cursor = "";
-      } else if (isMouseOnRotationHandle(mouseX, mouseY)) {
-        canvas.style.cursor = "grab";
-      } else if (isMouseOnRobot(mouseX, mouseY)) {
-        canvas.style.cursor = "move";
-      } else {
-        canvas.style.cursor = "";
+      if (robotDistanceX <= ROBOT_HALF_SIZE && robotDistanceY <= ROBOT_HALF_SIZE) {
+        dragStateRef.current.draggingRobot = true;
+        dragStateRef.current.dragOffsetX = point.x - position.x;
+        dragStateRef.current.dragOffsetY = point.y - position.y;
+        canvas.setPointerCapture(event.pointerId);
       }
     };
 
-    const onMouseLeave = () => {
-      canvas.style.cursor = "";
+    const onPointerMove = (event: PointerEvent) => {
+      if (activeTabRef.current !== "field" || simStatusRef.current !== "stopped") {
+        dragStateRef.current.draggingRobot = false;
+        dragStateRef.current.rotatingRobot = false;
+        return;
+      }
+
+      const dragState = dragStateRef.current;
+      if (!dragState.draggingRobot && !dragState.rotatingRobot) return;
+
+      const point = getCanvasPoint(event);
+      const current = robotRef.current;
+      let nextRobot = current;
+
+      if (dragState.draggingRobot) {
+        nextRobot = {
+          ...current,
+          x: (point.x - dragState.dragOffsetX - canvas.width / 2) / FIELD_SCALE,
+          y: (canvas.height / 2 - (point.y - dragState.dragOffsetY)) / FIELD_SCALE,
+        };
+      }
+
+      if (dragState.rotatingRobot) {
+        const position = robotScreenPosition(current);
+        nextRobot = {
+          ...current,
+          heading: Math.atan2(position.x - point.x, position.y - point.y),
+        };
+      }
+
+      robotRef.current = nextRobot;
+      setRobot(nextRobot);
+      sendPose(nextRobot);
+      draw();
     };
 
-    const onMouseUp = () => {
+    const onPointerUp = (event: PointerEvent) => {
       dragStateRef.current.draggingRobot = false;
       dragStateRef.current.rotatingRobot = false;
+      if (canvas.hasPointerCapture(event.pointerId)) {
+        canvas.releasePointerCapture(event.pointerId);
+      }
     };
 
-    canvas.addEventListener("mousedown", onMouseDown);
-    canvas.addEventListener("mousemove", onMouseMove);
-    canvas.addEventListener("mouseleave", onMouseLeave);
-    window.addEventListener("mouseup", onMouseUp);
+    let frameId = 0;
+    const renderLoop = () => {
+      draw();
+      frameId = window.requestAnimationFrame(renderLoop);
+    };
+
+    resize();
+    renderLoop();
+    window.addEventListener("resize", resize);
+    canvas.addEventListener("pointerdown", onPointerDown);
+    canvas.addEventListener("pointermove", onPointerMove);
+    canvas.addEventListener("pointerup", onPointerUp);
+    canvas.addEventListener("pointercancel", onPointerUp);
 
     return () => {
-      canvas.removeEventListener("mousedown", onMouseDown);
-      canvas.removeEventListener("mousemove", onMouseMove);
-      canvas.removeEventListener("mouseleave", onMouseLeave);
-      window.removeEventListener("mouseup", onMouseUp);
+      window.removeEventListener("resize", resize);
+      canvas.removeEventListener("pointerdown", onPointerDown);
+      canvas.removeEventListener("pointermove", onPointerMove);
+      canvas.removeEventListener("pointerup", onPointerUp);
+      canvas.removeEventListener("pointercancel", onPointerUp);
+      window.cancelAnimationFrame(frameId);
     };
   }, [sendPose]);
 
@@ -696,6 +796,7 @@ function App() {
         >
           Driver Station
         </button>
+
         <button
           className={activeTab === "configuration" ? "active" : ""}
           onClick={() => setActiveTab("configuration")}
@@ -703,6 +804,15 @@ function App() {
         >
           Configuration
         </button>
+
+        <button
+          className={activeTab === "onbotJava" ? "active" : ""}
+          onClick={() => setActiveTab("onbotJava")}
+          type="button"
+        >
+          OnBot Java
+        </button>
+
         <button className={activeTab === "field" ? "active" : ""} onClick={() => setActiveTab("field")} type="button">
           Field
         </button>
@@ -737,9 +847,6 @@ function App() {
         <h1>Configuration</h1>
 
         <h2>Hardware Map</h2>
-        <p>
-          Add hardware names so code like <code>hardwareMap.get(DcMotor.class, "leftFront")</code> works.
-        </p>
 
         <div className="config-actions">
           <button onClick={addHardwareRow} type="button">
@@ -760,11 +867,13 @@ function App() {
                   </option>
                 ))}
               </select>
+
               <input
                 onChange={(event) => updateHardwareRow(index, { name: event.target.value })}
                 placeholder="hardware name"
                 value={item.name}
               />
+
               <button onClick={() => removeHardwareRow(index)} type="button">
                 Remove
               </button>
@@ -773,8 +882,8 @@ function App() {
         </div>
 
         <h2>Gamepad Mapping</h2>
-        <p>Click a mapping space, then click a control button below or press a key.</p>
         <p className="binding-hint">{bindingHint}</p>
+
         <div className="input-palette">
           {bindableInputs.map((input) => (
             <button key={input.code} onClick={() => assignBinding(input.code)} type="button">
@@ -790,6 +899,7 @@ function App() {
           {([1, 2] as GamepadNumber[]).map((gamepadNumber) => (
             <section className="gamepad-config" key={gamepadNumber}>
               <h3>Gamepad {gamepadNumber}</h3>
+
               <div className="mapping-grid">
                 {gamepadControls.map((control) => (
                   <button
@@ -815,6 +925,84 @@ function App() {
             </section>
           ))}
         </div>
+      </section>
+
+      <section className={`tab app-panel ${activeTab === "onbotJava" ? "active" : ""}`}>
+        <h1>OnBot Java</h1>
+
+        <div
+          className="ide-shell"
+          style={{
+            height: editorHeight + EDITOR_TITLEBAR_HEIGHT + EDITOR_RESIZE_HANDLE_HEIGHT,
+          }}
+        >
+          <aside className="file-browser">
+            <div className="file-browser-title">TeamCode</div>
+
+            {teamCodeFolders.map((folder) => (
+              <div className="file-group" key={folder}>
+                <button className="file-group-title" onClick={() => toggleTeamCodeFolder(folder)} type="button">
+                  <span>{expandedTeamCodeFolders[folder] ? "v" : ">"}</span>
+                  <span>{folder}</span>
+                </button>
+
+                {expandedTeamCodeFolders[folder] &&
+                  teamCodeFilesByFolder[folder].map((fileName) => (
+                    <button
+                      className={`file-item ${codeFileName === fileName ? "active" : ""}`}
+                      disabled={isLoadingCodeFile}
+                      key={fileName}
+                      onClick={() => openCodeFile(fileName)}
+                      type="button"
+                    >
+                      {fileName.slice(folder.length + 1)}
+                    </button>
+                  ))}
+              </div>
+            ))}
+          </aside>
+
+          <div className="editor-pane">
+            <div className="editor-titlebar">
+              <span>{codeFileName || "No file selected"}</span>
+            </div>
+
+            <Editor
+              height={editorHeight}
+              language="java"
+              onChange={(value) => setCodeText(value ?? "")}
+              options={{
+                automaticLayout: true,
+                fontSize: 14,
+                minimap: { enabled: false },
+                scrollBeyondLastLine: false,
+                tabSize: 4,
+              }}
+              path={codeFileName || "blank.java"}
+              theme="vs-dark"
+              value={codeText}
+            />
+
+            <div
+              className="editor-resize-handle"
+              onPointerDown={startEditorResize}
+              role="separator"
+              tabIndex={0}
+            />
+          </div>
+        </div>
+
+        <div className="driver-actions">
+          <button disabled={!codeFileName || isLoadingCodeFile} onClick={saveCodeFile} type="button">
+            Save + Hot Reload
+          </button>
+
+          <button onClick={loadTeamCodeFiles} type="button">
+            Refresh Files
+          </button>
+        </div>
+
+        <p>{codeStatus}</p>
       </section>
 
       <section className={`tab field-tab ${activeTab === "field" ? "active" : ""}`}>
