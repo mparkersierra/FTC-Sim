@@ -70,6 +70,21 @@ h2 {
   padding: 20px;
 }
 
+.onbot-panel {
+  flex-direction: column;
+  height: calc(100vh - 42px);
+  padding: 0;
+  overflow: hidden;
+}
+
+.tab.onbot-panel {
+  display: none;
+}
+
+.tab.onbot-panel.active {
+  display: flex;
+}
+
 .driver-actions {
   margin-top: 20px;
 }
@@ -167,8 +182,10 @@ h2 {
 .ide-shell {
   display: grid;
   grid-template-columns: minmax(210px, 260px) minmax(0, 1fr);
-  min-height: 372px;
-  border: 1px solid #333;
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  border: 0;
   background: #151515;
 }
 
@@ -179,10 +196,53 @@ h2 {
 }
 
 .file-browser-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   padding: 12px;
   border-bottom: 1px solid #333;
   color: #ddd;
   font-weight: bold;
+}
+
+.file-browser-title > div:first-child {
+  min-width: 0;
+}
+
+.file-browser-target {
+  display: block;
+  max-width: 150px;
+  margin-top: 3px;
+  overflow: hidden;
+  color: #9ea7b3;
+  font-size: 11px;
+  font-weight: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-browser-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.file-browser-actions button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 26px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid #444;
+  background: #252525;
+  color: #ddd;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.file-browser-actions button:hover {
+  background: #333;
 }
 
 .file-group {
@@ -208,6 +268,11 @@ h2 {
   background: #242424;
 }
 
+.file-group-title[data-selected="true"] {
+  background: #283241;
+  color: #fff;
+}
+
 .file-item {
   display: block;
   width: 100%;
@@ -218,15 +283,225 @@ h2 {
   text-align: left;
 }
 
+.file-item.nested {
+  padding-left: 28px;
+}
+
 .file-item:hover,
-.file-item.active {
+.file-item.active,
+.file-item.selected {
   background: #2f3b4a;
+}
+
+.teamcode-context-menu {
+  position: fixed;
+  z-index: 20;
+  min-width: 132px;
+  padding: 4px;
+  border: 1px solid #444;
+  background: #202020;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.teamcode-context-menu button {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 7px 10px;
+  background: transparent;
+  color: #eee;
+  text-align: left;
+}
+
+.teamcode-context-menu button:hover {
+  background: #2f3b4a;
+}
+
+.ide-action-dock {
+  position: absolute;
+  right: 14px;
+  bottom: 18px;
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.ide-action-secondary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(10px);
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease;
+}
+
+.ide-action-dock:hover .ide-action-secondary,
+.ide-action-dock:focus-within .ide-action-secondary {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.ide-action-dock button {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid #555;
+  border-radius: 999px;
+  background: #2b3340;
+  color: #fff;
+  font-weight: bold;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+}
+
+.ide-action-dock button:hover {
+  background: #3a4658;
+}
+
+.ide-save-button {
+  width: 52px !important;
+  height: 52px !important;
+  background: #1f6feb !important;
+}
+
+.ide-save-button:hover {
+  background: #2f81f7 !important;
+}
+
+.save-icon {
+  position: relative;
+  width: 22px;
+  height: 22px;
+  border: 2px solid #fff;
+  border-radius: 3px;
+}
+
+.save-icon::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  width: 11px;
+  height: 5px;
+  background: #fff;
+}
+
+.save-icon::after {
+  content: "";
+  position: absolute;
+  right: 3px;
+  bottom: 2px;
+  left: 3px;
+  height: 7px;
+  border: 2px solid #fff;
+  border-bottom: 0;
+}
+
+.teamcode-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.48);
+}
+
+.teamcode-dialog {
+  width: min(460px, 100%);
+  padding: 16px;
+  border: 1px solid #444;
+  background: #202020;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+}
+
+.teamcode-dialog h2 {
+  margin: 0 0 12px;
+  color: #eee;
+  font-size: 16px;
+}
+
+.teamcode-dialog p {
+  margin: 0 0 14px;
+  color: #ddd;
+}
+
+.teamcode-dialog input {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  background: #111;
+  border: 1px solid #555;
+  color: #fff;
+}
+
+.teamcode-path-input {
+  display: grid;
+  grid-template-columns: minmax(0, max-content) minmax(120px, 1fr);
+  align-items: center;
+  border: 1px solid #555;
+  background: #111;
+}
+
+.teamcode-path-input span {
+  max-width: 220px;
+  padding-left: 8px;
+  overflow: hidden;
+  color: #9ea7b3;
+  font: 13px Menlo, Consolas, monospace;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.teamcode-path-input input {
+  border: 0;
+}
+
+.teamcode-template-options {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.teamcode-template-options label {
+  color: #ddd;
+  font-size: 13px;
+}
+
+.teamcode-template-options select {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  background: #111;
+  border: 1px solid #555;
+  color: #fff;
+}
+
+.teamcode-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.teamcode-dialog-actions button {
+  margin: 0;
 }
 
 .editor-pane {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
   overflow: hidden;
   background: #1e1e1e;
 }
@@ -241,25 +516,71 @@ h2 {
   font-size: 13px;
 }
 
-.editor-resize-handle {
+.monaco-shell {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.terminal-resize-handle {
+  flex: 0 0 auto;
   height: 12px;
   border-top: 1px solid #333;
+  border-bottom: 1px solid #333;
   background:
     linear-gradient(to bottom, transparent 0, transparent 4px, #555 4px, #555 5px, transparent 5px),
     #1a1a1a;
-  cursor: row-resize;
+  cursor: ns-resize;
 }
 
-.editor-resize-handle:hover {
+.terminal-resize-handle:hover {
   background:
     linear-gradient(to bottom, transparent 0, transparent 4px, #888 4px, #888 5px, transparent 5px),
     #222;
 }
 
+.runner-output {
+  flex: 0 0 auto;
+  min-height: 0;
+  margin: 0;
+  border: 0;
+  background: #111;
+}
+
+.runner-output-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 34px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #3a3a3a;
+  color: #ddd;
+  font-weight: bold;
+}
+
+.runner-output-title span:last-child {
+  overflow: hidden;
+  color: #9ea7b3;
+  font-size: 12px;
+  font-weight: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.runner-output pre {
+  height: calc(100% - 34px);
+  max-height: none;
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  color: #f0d28a;
+  font: 12px/1.45 Menlo, Consolas, monospace;
+  white-space: pre-wrap;
+}
+
 @media (max-width: 760px) {
   .ide-shell {
     grid-template-columns: 1fr;
-    height: auto;
   }
 
   .file-browser {

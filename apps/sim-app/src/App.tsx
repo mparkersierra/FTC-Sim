@@ -1,4 +1,13 @@
-import { type PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type FormEvent as ReactFormEvent,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { invoke } from "@tauri-apps/api/core";
 import Editor from "@monaco-editor/react";
 import "./App.css";
@@ -54,19 +63,62 @@ type Binding = {
 type ActiveBinding = Binding | null;
 type GamepadMappingConfig = Record<GamepadNumber, Partial<Record<GamepadControl, string>>>;
 type TeamCodeFolder = string;
+type TeamCodeContextMenu =
+  | {
+      kind: "file";
+      path: string;
+      x: number;
+      y: number;
+    }
+  | {
+      kind: "folder";
+      path: string;
+      x: number;
+      y: number;
+    };
+type TeamCodeFileTemplate = "java_class" | "autonomous" | "teleop";
+type TeamCodeSelection =
+  | {
+      kind: "root";
+      path: "";
+    }
+  | {
+      kind: "file" | "folder";
+      path: string;
+    };
+type TeamCodeDialog =
+  | {
+      kind: "createFile";
+      parentFolder: string;
+      template: TeamCodeFileTemplate;
+      value: string;
+    }
+  | {
+      kind: "createFolder";
+      parentFolder: string;
+      value: string;
+    }
+  | {
+      kind: "renameFile" | "renameFolder" | "deleteFile" | "deleteFolder";
+      path: string;
+      value: string;
+    };
 
 const FIELD_SCALE = 100;
 const ROBOT_HALF_SIZE = 35;
 const ROTATION_HANDLE_LENGTH = 70;
 const ROTATION_HANDLE_RADIUS = 9;
 const TOP_BAR_HEIGHT = 42;
-const MIN_EDITOR_HEIGHT = 320;
-const MAX_EDITOR_HEIGHT = 1200;
-const EDITOR_TITLEBAR_HEIGHT = 40;
-const EDITOR_RESIZE_HANDLE_HEIGHT = 12;
+const MIN_TERMINAL_HEIGHT = 0;
+const MAX_TERMINAL_HEIGHT = 520;
 
 const hardwareTypes = ["DcMotor"];
 const rootTeamCodeFolder = "(root)";
+const teamCodeFileTemplates: Array<{ id: TeamCodeFileTemplate; label: string }> = [
+  { id: "java_class", label: "Java Class" },
+  { id: "autonomous", label: "Autonomous" },
+  { id: "teleop", label: "TeleOp" },
+];
 
 const gamepadControls: Array<{ id: GamepadControl; label: string }> = [
   { id: "left_stick_up", label: "Left Stick Up" },
@@ -173,12 +225,17 @@ function App() {
   const [robot, setRobot] = useState<RobotState>(robotRef.current);
 
   const [teamCodeFiles, setTeamCodeFiles] = useState<string[]>([]);
+  const [teamCodeDirectories, setTeamCodeDirectories] = useState<string[]>([]);
   const [codeFileName, setCodeFileName] = useState("");
   const [codeText, setCodeText] = useState("");
   const [codeStatus, setCodeStatus] = useState("");
+  const [runnerLog, setRunnerLog] = useState("");
   const [isLoadingCodeFile, setIsLoadingCodeFile] = useState(false);
-  const [editorHeight, setEditorHeight] = useState(740);
+  const [terminalHeight, setTerminalHeight] = useState(180);
   const [expandedTeamCodeFolders, setExpandedTeamCodeFolders] = useState<Record<TeamCodeFolder, boolean>>({});
+  const [teamCodeContextMenu, setTeamCodeContextMenu] = useState<TeamCodeContextMenu | null>(null);
+  const [teamCodeDialog, setTeamCodeDialog] = useState<TeamCodeDialog | null>(null);
+  const [teamCodeSelection, setTeamCodeSelection] = useState<TeamCodeSelection>({ kind: "root", path: "" });
 
   useEffect(() => {
     robotRef.current = robot;
@@ -217,10 +274,23 @@ function App() {
 
   const loadTeamCodeFiles = useCallback(async () => {
     try {
-      const files = await invoke<string[]>("list_teamcode_files");
+      const [files, directories] = await Promise.all([
+        invoke<string[]>("list_teamcode_files"),
+        invoke<string[]>("list_teamcode_directories"),
+      ]);
       setTeamCodeFiles(files);
+      setTeamCodeDirectories(directories);
     } catch (error) {
       setCodeStatus(String(error));
+    }
+  }, []);
+
+  const loadRunnerLog = useCallback(async () => {
+    try {
+      const log = await invoke<string>("read_runner_log");
+      setRunnerLog(log);
+    } catch (error) {
+      setRunnerLog(String(error));
     }
   }, []);
 
@@ -228,6 +298,7 @@ function App() {
     try {
       setIsLoadingCodeFile(true);
       setCodeStatus(`Opening ${fileName}...`);
+      setTeamCodeSelection({ kind: "file", path: fileName });
       const contents = await invoke<string>("read_teamcode_file", {
         relativePath: fileName,
       });
@@ -244,7 +315,8 @@ function App() {
 
   useEffect(() => {
     loadTeamCodeFiles();
-  }, [loadTeamCodeFiles]);
+    loadRunnerLog();
+  }, [loadRunnerLog, loadTeamCodeFiles]);
 
   const saveCodeFile = async () => {
     if (!codeFileName) {
@@ -267,9 +339,250 @@ function App() {
       setStatusText("Restarting sim runner");
       setInfoText("Restarting sim runner");
       loadTeamCodeFiles();
+      window.setTimeout(() => {
+        loadRunnerLog();
+      }, 1200);
+    } catch (error) {
+      setCodeStatus(String(error));
+      loadRunnerLog();
+    }
+  };
+
+  const parentFolderForFile = (fileName: string) => {
+    if (!fileName.includes("/")) return "";
+    return fileName.slice(0, fileName.lastIndexOf("/"));
+  };
+
+  const selectedCreationFolder = () => {
+    if (teamCodeSelection.kind === "folder") return teamCodeSelection.path;
+    if (teamCodeSelection.kind === "file") return parentFolderForFile(teamCodeSelection.path);
+    return "";
+  };
+
+  const normalizeTeamCodeFilePath = (value: string) => {
+    const trimmed = value.trim().split("\\").join("/").replace(/^\/+|\/+$/g, "");
+    if (!trimmed) return "";
+    return trimmed.endsWith(".java") ? trimmed : `${trimmed}.java`;
+  };
+
+  const normalizeTeamCodeFolderPath = (value: string) => value.trim().split("\\").join("/").replace(/^\/+|\/+$/g, "");
+
+  const normalizeTeamCodeName = (value: string) => value.trim().replace(/^\/+|\/+$/g, "");
+
+  const teamCodePathInFolder = (parentFolder: string, name: string) =>
+    parentFolder ? `${parentFolder}/${name}` : name;
+
+  const createCodeFile = async () => {
+    setTeamCodeDialog({
+      kind: "createFile",
+      parentFolder: selectedCreationFolder(),
+      template: "java_class",
+      value: "NewClass.java",
+    });
+  };
+
+  const createCodeFolder = async () => {
+    setTeamCodeDialog({
+      kind: "createFolder",
+      parentFolder: selectedCreationFolder(),
+      value: "NewFolder",
+    });
+  };
+
+  const openTeamCodeContextMenu = (
+    event: ReactMouseEvent<HTMLButtonElement>,
+    menu: Omit<TeamCodeContextMenu, "x" | "y">,
+  ) => {
+    event.preventDefault();
+    setTeamCodeSelection(menu.kind === "file" ? { kind: "file", path: menu.path } : { kind: "folder", path: menu.path });
+    setTeamCodeContextMenu({
+      ...menu,
+      x: event.clientX,
+      y: event.clientY,
+    } as TeamCodeContextMenu);
+  };
+
+  const renameTeamCodeItem = async () => {
+    if (!teamCodeContextMenu) return;
+
+    const target = teamCodeContextMenu;
+    setTeamCodeContextMenu(null);
+    setTeamCodeDialog({
+      kind: target.kind === "file" ? "renameFile" : "renameFolder",
+      path: target.path,
+      value: target.path,
+    });
+  };
+
+  const deleteTeamCodeItem = async () => {
+    if (!teamCodeContextMenu) return;
+
+    const target = teamCodeContextMenu;
+    setTeamCodeContextMenu(null);
+    setTeamCodeDialog({
+      kind: target.kind === "file" ? "deleteFile" : "deleteFolder",
+      path: target.path,
+      value: target.path,
+    });
+  };
+
+  const createCodeFileFromContextFolder = () => {
+    if (!teamCodeContextMenu || teamCodeContextMenu.kind !== "folder") return;
+
+    const folder = teamCodeContextMenu.path;
+    setTeamCodeContextMenu(null);
+    setTeamCodeSelection({ kind: "folder", path: folder });
+    setTeamCodeDialog({ kind: "createFile", parentFolder: folder, template: "java_class", value: "NewClass.java" });
+  };
+
+  const createCodeFolderFromContextFolder = () => {
+    if (!teamCodeContextMenu || teamCodeContextMenu.kind !== "folder") return;
+
+    const folder = teamCodeContextMenu.path;
+    setTeamCodeContextMenu(null);
+    setTeamCodeSelection({ kind: "folder", path: folder });
+    setTeamCodeDialog({ kind: "createFolder", parentFolder: folder, value: "NewFolder" });
+  };
+
+  const submitTeamCodeDialog = async (event: ReactFormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!teamCodeDialog) return;
+
+    const dialog = teamCodeDialog;
+    try {
+      if (dialog.kind === "createFile") {
+        const fileName = normalizeTeamCodeName(dialog.value);
+        if (!fileName) {
+          setCodeStatus("Enter a Java file path");
+          return;
+        }
+        if (fileName.includes("/") || fileName.includes("\\")) {
+          setCodeStatus("Enter only a file name. The folder is already selected.");
+          return;
+        }
+
+        const relativePath = normalizeTeamCodeFilePath(teamCodePathInFolder(dialog.parentFolder, fileName));
+        setCodeStatus(`Creating ${relativePath}...`);
+        const contents = await invoke<string>("create_teamcode_file", {
+          relativePath,
+          template: dialog.template,
+        });
+        setCodeFileName(relativePath);
+        setCodeText(contents);
+        setTeamCodeSelection({ kind: "file", path: relativePath });
+        setExpandedTeamCodeFolders((current) => {
+          const folder = relativePath.includes("/")
+            ? relativePath.slice(0, relativePath.lastIndexOf("/"))
+            : rootTeamCodeFolder;
+          return { ...current, [folder]: true };
+        });
+      }
+
+      if (dialog.kind === "createFolder") {
+        const folderName = normalizeTeamCodeName(dialog.value);
+        if (!folderName) {
+          setCodeStatus("Enter a folder path");
+          return;
+        }
+        if (folderName.includes("/") || folderName.includes("\\")) {
+          setCodeStatus("Enter only a folder name. The parent folder is already selected.");
+          return;
+        }
+
+        const relativePath = normalizeTeamCodeFolderPath(teamCodePathInFolder(dialog.parentFolder, folderName));
+        setCodeStatus(`Creating ${relativePath}...`);
+        await invoke<string>("create_teamcode_folder", { relativePath });
+        setTeamCodeSelection({ kind: "folder", path: relativePath });
+        setExpandedTeamCodeFolders((current) => ({ ...current, [relativePath]: true }));
+      }
+
+      if (dialog.kind === "renameFile" || dialog.kind === "renameFolder") {
+        const nextPath =
+          dialog.kind === "renameFile"
+            ? normalizeTeamCodeFilePath(dialog.value)
+            : normalizeTeamCodeFolderPath(dialog.value);
+        if (!nextPath) {
+          setCodeStatus(dialog.kind === "renameFile" ? "Enter a Java file path" : "Enter a folder path");
+          return;
+        }
+
+        setCodeStatus(`Renaming ${dialog.path}...`);
+        if (dialog.kind === "renameFile") {
+          await invoke<string>("rename_teamcode_file", {
+            fromPath: dialog.path,
+            toPath: nextPath,
+          });
+          if (codeFileName === dialog.path) {
+            setCodeFileName(nextPath);
+          }
+          if (teamCodeSelection.kind === "file" && teamCodeSelection.path === dialog.path) {
+            setTeamCodeSelection({ kind: "file", path: nextPath });
+          }
+        } else {
+          await invoke<string>("rename_teamcode_folder", {
+            fromPath: dialog.path,
+            toPath: nextPath,
+          });
+          if (codeFileName === dialog.path || codeFileName.startsWith(`${dialog.path}/`)) {
+            setCodeFileName(codeFileName.replace(dialog.path, nextPath));
+          }
+          if (teamCodeSelection.kind === "folder" && teamCodeSelection.path === dialog.path) {
+            setTeamCodeSelection({ kind: "folder", path: nextPath });
+          }
+          if (teamCodeSelection.kind === "file" && teamCodeSelection.path.startsWith(`${dialog.path}/`)) {
+            setTeamCodeSelection({ kind: "file", path: teamCodeSelection.path.replace(dialog.path, nextPath) });
+          }
+          setExpandedTeamCodeFolders((current) => {
+            const next = { ...current };
+            next[nextPath] = next[dialog.path] ?? true;
+            delete next[dialog.path];
+            return next;
+          });
+        }
+      }
+
+      if (dialog.kind === "deleteFile" || dialog.kind === "deleteFolder") {
+        setCodeStatus(`Deleting ${dialog.path}...`);
+        if (dialog.kind === "deleteFile") {
+          await invoke<string>("delete_teamcode_file", { relativePath: dialog.path });
+          if (codeFileName === dialog.path) {
+            setCodeFileName("");
+            setCodeText("");
+          }
+          if (teamCodeSelection.kind === "file" && teamCodeSelection.path === dialog.path) {
+            setTeamCodeSelection({ kind: "root", path: "" });
+          }
+        } else {
+          await invoke<string>("delete_teamcode_folder", { relativePath: dialog.path });
+          if (codeFileName === dialog.path || codeFileName.startsWith(`${dialog.path}/`)) {
+            setCodeFileName("");
+            setCodeText("");
+          }
+          if (teamCodeSelection.path === dialog.path || teamCodeSelection.path.startsWith(`${dialog.path}/`)) {
+            setTeamCodeSelection({ kind: "root", path: "" });
+          }
+          setExpandedTeamCodeFolders((current) => {
+            const next = { ...current };
+            delete next[dialog.path];
+            return next;
+          });
+        }
+      }
+
+      setTeamCodeDialog(null);
+      await loadTeamCodeFiles();
+      setCodeStatus("");
     } catch (error) {
       setCodeStatus(String(error));
     }
+  };
+
+  const updateTeamCodeDialogValue = (value: string) => {
+    setTeamCodeDialog((current) => (current ? { ...current, value } : current));
+  };
+
+  const updateTeamCodeDialogTemplate = (template: TeamCodeFileTemplate) => {
+    setTeamCodeDialog((current) => (current?.kind === "createFile" ? { ...current, template } : current));
   };
 
   const saveHardwareMap = useCallback(() => {
@@ -306,6 +619,7 @@ function App() {
           setInfoText("Connected");
           setCodeStatus((current) => (current.endsWith("Reconnecting...") ? "Hot reload complete" : current));
           requestOpModes();
+          loadRunnerLog();
           saveHardwareMap();
         };
 
@@ -315,6 +629,10 @@ function App() {
           if (msg.type === "opModes") {
             setOpModes(msg.items);
             setSelectedOpModeId((current) => current || msg.items[0]?.id || "");
+            if (msg.items.length === 0) {
+              setCodeStatus("No OpModes found. Check Runner Output for compile errors.");
+              loadRunnerLog();
+            }
           }
 
           if (msg.type === "robotState") {
@@ -359,11 +677,28 @@ function App() {
       socketRef.current?.close();
       socketRef.current = null;
     };
-  }, [requestOpModes, saveHardwareMap]);
+  }, [loadRunnerLog, requestOpModes, saveHardwareMap]);
 
   useEffect(() => {
     saveHardwareMap();
   }, [saveHardwareMap]);
+
+  useEffect(() => {
+    const closeContextMenu = () => setTeamCodeContextMenu(null);
+    const closeContextMenuOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        closeContextMenu();
+      }
+    };
+
+    window.addEventListener("click", closeContextMenu);
+    window.addEventListener("keydown", closeContextMenuOnEscape);
+
+    return () => {
+      window.removeEventListener("click", closeContextMenu);
+      window.removeEventListener("keydown", closeContextMenuOnEscape);
+    };
+  }, []);
 
   const mainActionButtonText = useMemo(() => {
     if (simStatus === "initialized") return "START";
@@ -374,36 +709,48 @@ function App() {
   const teamCodeFilesByFolder = useMemo(() => {
     const groups: Record<TeamCodeFolder, string[]> = {};
 
+    for (const directory of teamCodeDirectories) {
+      groups[directory] = groups[directory] ?? [];
+    }
+
     for (const fileName of teamCodeFiles) {
-      const separatorIndex = fileName.indexOf("/");
+      const separatorIndex = fileName.lastIndexOf("/");
       const folder = separatorIndex === -1 ? rootTeamCodeFolder : fileName.slice(0, separatorIndex);
       groups[folder] = [...(groups[folder] ?? []), fileName];
     }
 
     return groups;
-  }, [teamCodeFiles]);
+  }, [teamCodeDirectories, teamCodeFiles]);
 
   const teamCodeFolders = useMemo(
-    () => Object.keys(teamCodeFilesByFolder).sort((a, b) => a.localeCompare(b)),
+    () =>
+      Object.keys(teamCodeFilesByFolder)
+        .filter((folder) => folder !== rootTeamCodeFolder)
+        .sort((a, b) => a.localeCompare(b)),
     [teamCodeFilesByFolder],
   );
 
+  const rootTeamCodeFiles = teamCodeFilesByFolder[rootTeamCodeFolder] ?? [];
+
+  const selectedTargetLabel = teamCodeSelection.kind === "root" ? "TeamCode" : teamCodeSelection.path;
+
   const toggleTeamCodeFolder = (folder: TeamCodeFolder) => {
+    setTeamCodeSelection({ kind: "folder", path: folder });
     setExpandedTeamCodeFolders((current) => ({
       ...current,
       [folder]: !current[folder],
     }));
   };
 
-  const startEditorResize = (event: ReactPointerEvent<HTMLDivElement>) => {
+  const startTerminalResize = (event: ReactPointerEvent<HTMLDivElement>) => {
     event.preventDefault();
 
     const startY = event.clientY;
-    const startHeight = editorHeight;
+    const startHeight = terminalHeight;
 
     const onPointerMove = (moveEvent: PointerEvent) => {
-      const nextHeight = startHeight + moveEvent.clientY - startY;
-      setEditorHeight(Math.max(MIN_EDITOR_HEIGHT, Math.min(MAX_EDITOR_HEIGHT, nextHeight)));
+      const nextHeight = startHeight + startY - moveEvent.clientY;
+      setTerminalHeight(Math.max(MIN_TERMINAL_HEIGHT, Math.min(MAX_TERMINAL_HEIGHT, nextHeight)));
     };
 
     const onPointerUp = () => {
@@ -413,7 +760,7 @@ function App() {
       document.body.style.userSelect = "";
     };
 
-    document.body.style.cursor = "row-resize";
+    document.body.style.cursor = "ns-resize";
     document.body.style.userSelect = "none";
     window.addEventListener("pointermove", onPointerMove);
     window.addEventListener("pointerup", onPointerUp);
@@ -787,6 +1134,20 @@ function App() {
     };
   }, [sendPose]);
 
+  const isDeleteTeamCodeDialog =
+    teamCodeDialog?.kind === "deleteFile" || teamCodeDialog?.kind === "deleteFolder";
+  const teamCodeDialogTitle = teamCodeDialog
+    ? {
+        createFile: "New File",
+        createFolder: "New Folder",
+        renameFile: "Rename File",
+        renameFolder: "Rename Folder",
+        deleteFile: "Delete File",
+        deleteFolder: "Delete Folder",
+      }[teamCodeDialog.kind]
+    : "";
+  const teamCodeDialogSubmitLabel = isDeleteTeamCodeDialog ? "Delete" : "OK";
+
   return (
     <>
       <nav className="tabs">
@@ -928,32 +1289,58 @@ function App() {
         </div>
       </section>
 
-      <section className={`tab app-panel ${activeTab === "onbotJava" ? "active" : ""}`}>
-        <h1>OnBot Java</h1>
-
-        <div
-          className="ide-shell"
-          style={{
-            height: editorHeight + EDITOR_TITLEBAR_HEIGHT + EDITOR_RESIZE_HANDLE_HEIGHT,
-          }}
-        >
+      <section className={`tab app-panel onbot-panel ${activeTab === "onbotJava" ? "active" : ""}`}>
+        <div className="ide-shell">
           <aside className="file-browser">
-            <div className="file-browser-title">TeamCode</div>
+            <div className="file-browser-title">
+              <div>
+                <span>TeamCode</span>
+                <span className="file-browser-target">Target: {selectedTargetLabel}</span>
+              </div>
+              <div className="file-browser-actions" aria-label="TeamCode file commands">
+                <button onClick={createCodeFile} title="New File" type="button">
+                  +
+                </button>
+                <button onClick={createCodeFolder} title="New Folder" type="button">
+                  +/
+                </button>
+              </div>
+            </div>
+
+            {rootTeamCodeFiles.map((fileName) => (
+              <button
+                className={`file-item ${teamCodeSelection.kind === "file" && teamCodeSelection.path === fileName ? "selected" : ""}`}
+                disabled={isLoadingCodeFile}
+                key={fileName}
+                onClick={() => openCodeFile(fileName)}
+                onContextMenu={(event) => openTeamCodeContextMenu(event, { kind: "file", path: fileName })}
+                type="button"
+              >
+                {fileName}
+              </button>
+            ))}
 
             {teamCodeFolders.map((folder) => (
               <div className="file-group" key={folder}>
-                <button className="file-group-title" onClick={() => toggleTeamCodeFolder(folder)} type="button">
-                  <span>{expandedTeamCodeFolders[folder] ? "v" : ">"}</span>
+                <button
+                  className="file-group-title"
+                  onClick={() => toggleTeamCodeFolder(folder)}
+                  onContextMenu={(event) => openTeamCodeContextMenu(event, { kind: "folder", path: folder })}
+                  data-selected={teamCodeSelection.kind === "folder" && teamCodeSelection.path === folder}
+                  type="button"
+                >
+                  <span>{expandedTeamCodeFolders[folder] ?? true ? "v" : ">"}</span>
                   <span>{folder}</span>
                 </button>
 
                 {(expandedTeamCodeFolders[folder] ?? true) &&
                   teamCodeFilesByFolder[folder].map((fileName) => (
                     <button
-                      className={`file-item ${codeFileName === fileName ? "active" : ""}`}
+                      className={`file-item nested ${teamCodeSelection.kind === "file" && teamCodeSelection.path === fileName ? "selected" : ""}`}
                       disabled={isLoadingCodeFile}
                       key={fileName}
                       onClick={() => openCodeFile(fileName)}
+                      onContextMenu={(event) => openTeamCodeContextMenu(event, { kind: "file", path: fileName })}
                       type="button"
                     >
                       {folder === rootTeamCodeFolder ? fileName : fileName.slice(folder.length + 1)}
@@ -968,8 +1355,9 @@ function App() {
               <span>{codeFileName || "No file selected"}</span>
             </div>
 
+            <div className="monaco-shell">
             <Editor
-              height={editorHeight}
+              height="100%"
               language="java"
               onChange={(value) => setCodeText(value ?? "")}
               options={{
@@ -983,27 +1371,134 @@ function App() {
               theme="vs-dark"
               value={codeText}
             />
+            </div>
 
             <div
-              className="editor-resize-handle"
-              onPointerDown={startEditorResize}
+              className="terminal-resize-handle"
+              onPointerDown={startTerminalResize}
               role="separator"
               tabIndex={0}
             />
+
+            <section className="runner-output" style={{ height: terminalHeight }}>
+              <div className="runner-output-title">
+                <span>Terminal</span>
+                <span>{codeStatus}</span>
+              </div>
+              <pre>{runnerLog || "Runner output will appear here."}</pre>
+            </section>
           </div>
+
+          <div className="ide-action-dock" style={{ bottom: terminalHeight + 18 }}>
+            <div className="ide-action-secondary">
+              <button onClick={loadRunnerLog} title="Refresh Runner Output" type="button">
+                !
+              </button>
+              <button onClick={loadTeamCodeFiles} title="Refresh Files" type="button">
+                R
+              </button>
+            </div>
+
+            <button
+              className="ide-save-button"
+              disabled={!codeFileName || isLoadingCodeFile}
+              onClick={saveCodeFile}
+              title="Save"
+              type="button"
+            >
+              <span className="save-icon" aria-hidden="true" />
+            </button>
+          </div>
+
+          {teamCodeContextMenu && (
+            <div
+              className="teamcode-context-menu"
+              onClick={(event) => event.stopPropagation()}
+              style={{ left: teamCodeContextMenu.x, top: teamCodeContextMenu.y }}
+            >
+              {teamCodeContextMenu.kind === "folder" && (
+                <>
+                  <button onClick={createCodeFileFromContextFolder} type="button">
+                    New File
+                  </button>
+                  <button onClick={createCodeFolderFromContextFolder} type="button">
+                    New Folder
+                  </button>
+                </>
+              )}
+              <button onClick={renameTeamCodeItem} type="button">
+                Rename
+              </button>
+              <button onClick={deleteTeamCodeItem} type="button">
+                Delete
+              </button>
+            </div>
+          )}
+
+          {teamCodeDialog && (
+            <div className="teamcode-dialog-backdrop" onMouseDown={() => setTeamCodeDialog(null)}>
+              <form
+                className="teamcode-dialog"
+                onMouseDown={(event) => event.stopPropagation()}
+                onSubmit={submitTeamCodeDialog}
+              >
+                <h2>{teamCodeDialogTitle}</h2>
+
+                {isDeleteTeamCodeDialog ? (
+                  <p>
+                    {teamCodeDialog.kind === "deleteFolder"
+                      ? `Delete folder ${teamCodeDialog.path} and everything inside it?`
+                      : `Delete ${teamCodeDialog.path}?`}
+                  </p>
+                ) : (
+                  <>
+                    {(teamCodeDialog.kind === "createFile" || teamCodeDialog.kind === "createFolder") &&
+                    teamCodeDialog.parentFolder ? (
+                      <div className="teamcode-path-input">
+                        <span>{teamCodeDialog.parentFolder}/</span>
+                        <input
+                          autoFocus
+                          onChange={(event) => updateTeamCodeDialogValue(event.target.value)}
+                          value={teamCodeDialog.value}
+                        />
+                      </div>
+                    ) : (
+                      <input
+                        autoFocus
+                        onChange={(event) => updateTeamCodeDialogValue(event.target.value)}
+                        value={teamCodeDialog.value}
+                      />
+                    )}
+
+                    {teamCodeDialog.kind === "createFile" && (
+                      <div className="teamcode-template-options">
+                        <label htmlFor="teamcode-file-template">Template</label>
+                        <select
+                          id="teamcode-file-template"
+                          onChange={(event) => updateTeamCodeDialogTemplate(event.target.value as TeamCodeFileTemplate)}
+                          value={teamCodeDialog.template}
+                        >
+                          {teamCodeFileTemplates.map((template) => (
+                            <option key={template.id} value={template.id}>
+                              {template.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                <div className="teamcode-dialog-actions">
+                  <button onClick={() => setTeamCodeDialog(null)} type="button">
+                    Cancel
+                  </button>
+                  <button type="submit">{teamCodeDialogSubmitLabel}</button>
+                </div>
+              </form>
+            </div>
+          )}
         </div>
-
-        <div className="driver-actions">
-          <button disabled={!codeFileName || isLoadingCodeFile} onClick={saveCodeFile} type="button">
-            Save + Hot Reload
-          </button>
-
-          <button onClick={loadTeamCodeFiles} type="button">
-            Refresh Files
-          </button>
-        </div>
-
-        <p>{codeStatus}</p>
       </section>
 
       <section className={`tab field-tab ${activeTab === "field" ? "active" : ""}`}>
