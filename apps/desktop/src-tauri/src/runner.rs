@@ -16,6 +16,8 @@ use crate::{
 static SIM_RUNNER: OnceLock<Mutex<Option<Child>>> = OnceLock::new();
 static SIM_RUNNER_WORKER: OnceLock<Mutex<()>> = OnceLock::new();
 const SIM_RUNNER_PORT: u16 = 8080;
+const TEAMCODE_COMPILE_ERROR_PREFIX: &str = "TEAMCODE_COMPILE_ERROR: ";
+const TEAMCODE_COMPILE_STATUS_PREFIX: &str = "TEAMCODE_COMPILE_STATUS: ";
 const PORT_RELEASE_TIMEOUT: Duration = Duration::from_secs(10);
 const PORT_RELEASE_POLL_INTERVAL: Duration = Duration::from_millis(100);
 const RUNNER_START_TIMEOUT: Duration = Duration::from_secs(5);
@@ -254,7 +256,16 @@ pub(crate) fn read_runner_log() -> Result<String, String> {
     }
 
     let contents = fs::read_to_string(log_path).map_err(|e| e.to_string())?;
-    let lines: Vec<&str> = contents.lines().rev().take(200).collect();
+    let lines: Vec<String> = contents
+        .lines()
+        .filter_map(|line| {
+            line.strip_prefix(TEAMCODE_COMPILE_ERROR_PREFIX)
+                .or_else(|| line.strip_prefix(TEAMCODE_COMPILE_STATUS_PREFIX))
+                .map(str::to_string)
+        })
+        .rev()
+        .take(200)
+        .collect();
     Ok(lines.into_iter().rev().collect::<Vec<_>>().join("\n"))
 }
 

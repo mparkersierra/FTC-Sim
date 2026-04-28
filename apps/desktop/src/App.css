@@ -89,16 +89,112 @@ h2 {
   margin-top: 20px;
 }
 
-.field-tab canvas {
-  display: block;
-  width: 100vw;
+.driver-station-tab {
   height: calc(100vh - 42px);
+  overflow: hidden;
+  background: #111;
+}
+
+.tab.driver-station-tab.active {
+  display: block;
+}
+
+.driver-station-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
+  gap: 18px;
+  height: 100%;
+  padding: 18px;
+  overflow: hidden;
+}
+
+.driver-station-left {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 14px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.driver-station-card {
+  max-height: min(360px, 48vh);
+  padding: 18px;
+  overflow: auto;
+  border: 1px solid #333;
+  border-radius: 8px;
+  background: #181818;
+}
+
+.driver-station-card h1 {
+  margin: 0 0 16px;
+  font-size: 24px;
+}
+
+.driver-station-card select {
+  width: 100%;
+  min-width: 0;
+  margin-right: 0;
+  background: #111;
+  border: 1px solid #555;
+  color: #fff;
+}
+
+.telemetry-panel {
+  min-height: 0;
+  padding: 12px;
+  overflow: auto;
+  border: 1px solid #2d2d2d;
+  border-radius: 8px;
+  background: #151515;
+}
+
+.telemetry-row {
+  display: grid;
+  grid-template-columns: minmax(0, 42%) minmax(0, 1fr);
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px solid #242424;
+  font: 13px/1.35 Menlo, Consolas, monospace;
+}
+
+.telemetry-row:last-child {
+  border-bottom: 0;
+}
+
+.telemetry-caption {
+  overflow-wrap: anywhere;
+  color: #9ea7b3;
+}
+
+.telemetry-value {
+  overflow-wrap: anywhere;
+  color: #eee;
+}
+
+.field-panel {
+  position: relative;
+  align-self: start;
+  justify-self: center;
+  width: min(100%, calc(100vh - 78px));
+  max-width: 100%;
+  aspect-ratio: 1;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #333;
+  border-radius: 8px;
+  background: #2f6f3e;
+}
+
+.field-panel canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
   background: #2f6f3e;
 }
 
 .info {
-  position: fixed;
-  top: 60px;
+  position: absolute;
+  top: 12px;
   left: 12px;
   background: rgba(0, 0, 0, 0.65);
   padding: 10px;
@@ -579,6 +675,29 @@ h2 {
 }
 
 @media (max-width: 760px) {
+  .driver-station-tab {
+    overflow: auto;
+  }
+
+  .driver-station-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
+    min-height: 100%;
+    overflow: visible;
+  }
+
+  .driver-station-left {
+    grid-template-rows: auto minmax(160px, 1fr);
+  }
+
+  .driver-station-card {
+    max-height: 280px;
+  }
+
+  .field-panel {
+    width: min(100%, calc(100vw - 36px));
+  }
+
   .ide-shell {
     grid-template-columns: 1fr;
   }

@@ -22,7 +22,6 @@ import { Tabs } from "./components/Tabs";
 import { useFieldCanvas } from "./hooks/useFieldCanvas";
 import { ConfigurationPage } from "./pages/ConfigurationPage";
 import { DriverStationPage } from "./pages/DriverStationPage";
-import { FieldPage } from "./pages/FieldPage";
 import { OnBotJavaPage } from "./pages/OnBotJavaPage";
 import type {
   ActiveBinding,
@@ -40,6 +39,7 @@ import type {
   TeamCodeFileTemplate,
   TeamCodeFolder,
   TeamCodeSelection,
+  TelemetryItem,
 } from "./types";
 import "./App.css";
 
@@ -72,6 +72,7 @@ function App() {
   const [activeBinding, setActiveBinding] = useState<ActiveBinding>(null);
   const [bindingHint, setBindingHint] = useState("");
   const [robot, setRobot] = useState<RobotState>(robotRef.current);
+  const [telemetryItems, setTelemetryItems] = useState<TelemetryItem[]>([]);
 
   const [teamCodeFiles, setTeamCodeFiles] = useState<string[]>([]);
   const [teamCodeDirectories, setTeamCodeDirectories] = useState<string[]>([]);
@@ -497,6 +498,17 @@ function App() {
           if (msg.type === "opModeStopped") {
             setSimStatus("stopped");
             setStatusText("Stopped");
+            setTelemetryItems([]);
+          }
+
+          if (msg.type === "telemetry") {
+            const items = Array.isArray(msg.items) ? msg.items : [];
+            setTelemetryItems(
+              items.map((item: { caption?: unknown; value?: unknown }) => ({
+                caption: String(item.caption ?? ""),
+                value: String(item.value ?? ""),
+              })),
+            );
           }
         };
 
@@ -623,6 +635,7 @@ function App() {
       id: selectedOpModeId,
     });
 
+    setTelemetryItems([]);
     const selected = opModes.find((item) => item.id === selectedOpModeId);
     setSimStatus("initialized");
     setStatusText(`Initialized: ${selected ? `${selected.modeType} - ${selected.name}` : selectedOpModeId}`);
@@ -632,13 +645,14 @@ function App() {
     send({ type: "start" });
     setSimStatus("running");
     setStatusText("Started");
-    setActiveTab("field");
+    setActiveTab("driverStation");
   };
 
   const stopOpMode = () => {
     send({ type: "stop" });
     setSimStatus("stopped");
     setStatusText("Stopped");
+    setTelemetryItems([]);
   };
 
   const mainAction = () => {
@@ -738,7 +752,7 @@ function App() {
   }, [sendBinding]);
 
   useEffect(() => {
-    if (activeTab !== "field") {
+    if (activeTab !== "driverStation") {
       releasePressedBindings();
     }
   }, [activeTab, releasePressedBindings]);
@@ -753,7 +767,7 @@ function App() {
         return;
       }
 
-      if (activeTabRef.current !== "field") return;
+      if (activeTabRef.current !== "driverStation") return;
 
       const bindings = bindingsForKey(key);
       if (bindings.length === 0) return;
@@ -771,7 +785,7 @@ function App() {
 
     const onKeyUp = (event: KeyboardEvent) => {
       const key = event.key.toLowerCase();
-      if (activeTabRef.current !== "field") return;
+      if (activeTabRef.current !== "driverStation") return;
 
       const bindings = bindingsForKey(key);
       if (bindings.length === 0) return;
@@ -838,10 +852,13 @@ function App() {
 
       <DriverStationPage
         activeTab={activeTab}
+        canvasRef={canvasRef}
+        infoText={infoText}
         mainActionButtonText={mainActionButtonText}
         opModes={opModes}
         selectedOpModeId={selectedOpModeId}
         statusText={statusText}
+        telemetryItems={telemetryItems}
         onMainAction={mainAction}
         onRequestOpModes={requestOpModes}
         onSelectOpMode={setSelectedOpModeId}
@@ -903,8 +920,6 @@ function App() {
         onUpdateTeamCodeDialogTemplate={updateTeamCodeDialogTemplate}
         onUpdateTeamCodeDialogValue={updateTeamCodeDialogValue}
       />
-
-      <FieldPage activeTab={activeTab} canvasRef={canvasRef} infoText={infoText} />
     </>
   );
 }

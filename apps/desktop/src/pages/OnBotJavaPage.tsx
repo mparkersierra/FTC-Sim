@@ -193,7 +193,7 @@ export function OnBotJavaPage({
               <span>Terminal</span>
               <span>{codeStatus}</span>
             </div>
-            <pre>{runnerLog || "Runner output will appear here."}</pre>
+            <pre>{runnerLog || "TeamCode compile errors will appear here."}</pre>
           </section>
         </div>
 

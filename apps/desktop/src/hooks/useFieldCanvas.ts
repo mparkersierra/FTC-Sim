@@ -4,7 +4,6 @@ import {
   ROBOT_HALF_SIZE,
   ROTATION_HANDLE_LENGTH,
   ROTATION_HANDLE_RADIUS,
-  TOP_BAR_HEIGHT,
 } from "../config";
 import type { RobotState, SimStatus, TabId } from "../types";
 
@@ -111,13 +110,15 @@ export function useFieldCanvas({
     };
 
     const resize = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight - TOP_BAR_HEIGHT;
+      const rect = canvas.getBoundingClientRect();
+      const size = Math.max(1, Math.floor(Math.min(rect.width, rect.height)));
+      canvas.width = size;
+      canvas.height = size;
       draw();
     };
 
     const onPointerDown = (event: PointerEvent) => {
-      if (activeTabRef.current !== "field" || simStatusRef.current !== "stopped") return;
+      if (activeTabRef.current !== "driverStation" || simStatusRef.current !== "stopped") return;
 
       const point = getCanvasPoint(event);
       const state = robotRef.current;
@@ -142,7 +143,7 @@ export function useFieldCanvas({
     };
 
     const onPointerMove = (event: PointerEvent) => {
-      if (activeTabRef.current !== "field" || simStatusRef.current !== "stopped") {
+      if (activeTabRef.current !== "driverStation" || simStatusRef.current !== "stopped") {
         dragStateRef.current.draggingRobot = false;
         dragStateRef.current.rotatingRobot = false;
         return;
@@ -193,6 +194,8 @@ export function useFieldCanvas({
 
     resize();
     renderLoop();
+    const resizeObserver = new ResizeObserver(resize);
+    resizeObserver.observe(canvas);
     window.addEventListener("resize", resize);
     canvas.addEventListener("pointerdown", onPointerDown);
     canvas.addEventListener("pointermove", onPointerMove);
@@ -201,6 +204,7 @@ export function useFieldCanvas({
 
     return () => {
       window.removeEventListener("resize", resize);
+      resizeObserver.disconnect();
       canvas.removeEventListener("pointerdown", onPointerDown);
       canvas.removeEventListener("pointermove", onPointerMove);
       canvas.removeEventListener("pointerup", onPointerUp);

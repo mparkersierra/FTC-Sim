@@ -9,12 +9,20 @@ import javax.tools.ToolProvider;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Stream;
 
 public class TeamCodeCompiler {
+    private static final String DIAGNOSTIC_PREFIX = "TEAMCODE_COMPILE_ERROR: ";
+    private static final String STATUS_PREFIX = "TEAMCODE_COMPILE_STATUS: ";
+    private static final DateTimeFormatter TIMESTAMP_FORMAT =
+        DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private final TeamCodeWorkspace workspace;
 
     public TeamCodeCompiler(TeamCodeWorkspace workspace) {
@@ -22,6 +30,8 @@ public class TeamCodeCompiler {
     }
 
     public boolean compile() {
+        long startedAt = System.nanoTime();
+
         try {
             Files.createDirectories(workspace.sourceRoot());
 
@@ -30,6 +40,7 @@ public class TeamCodeCompiler {
                 deleteTree(workspace.classOutputRoot());
                 deleteTree(workspace.nextClassOutputRoot());
                 System.out.println("TeamCode workspace has no Java files: " + workspace.sourceRoot());
+                printCompileSuccess(startedAt, "No Java files found.");
                 return true;
             }
 
@@ -38,7 +49,7 @@ public class TeamCodeCompiler {
 
             JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
             if (compiler == null) {
-                System.err.println(
+                printCompileError(
                     "No Java compiler is available. Bundle a runtime that includes the jdk.compiler module."
                 );
                 return false;
@@ -62,12 +73,13 @@ public class TeamCodeCompiler {
 
                 if (ok) {
                     replaceClassOutput();
+                    printCompileSuccess(startedAt, "Compiled " + sourceFiles.size() + " Java file(s).");
                 }
 
                 return ok;
             }
         } catch (IOException error) {
-            error.printStackTrace();
+            printCompileError(error.getMessage());
             return false;
         }
     }
@@ -108,7 +120,50 @@ public class TeamCodeCompiler {
 
     private void printDiagnostics(DiagnosticCollector<JavaFileObject> diagnostics) {
         for (Diagnostic<? extends JavaFileObject> diagnostic : diagnostics.getDiagnostics()) {
-            System.err.println(diagnostic);
+            if (diagnostic.getKind() == Diagnostic.Kind.ERROR) {
+                printCompileError(formatDiagnostic(diagnostic));
+            }
         }
+    }
+
+    private String formatDiagnostic(Diagnostic<? extends JavaFileObject> diagnostic) {
+        String location = "TeamCode";
+
+        if (diagnostic.getSource() != null) {
+            try {
+                Path sourcePath = Path.of(diagnostic.getSource().toUri()).toAbsolutePath().normalize();
+                Path relativePath = workspace.sourceRoot().relativize(sourcePath);
+                location = relativePath.toString();
+            } catch (IllegalArgumentException error) {
+                location = diagnostic.getSource().getName();
+            }
+        }
+
+        if (diagnostic.getLineNumber() > 0) {
+            location += ":" + diagnostic.getLineNumber();
+            if (diagnostic.getColumnNumber() > 0) {
+                location += ":" + diagnostic.getColumnNumber();
+            }
+        }
+
+        String message = diagnostic.getMessage(Locale.getDefault()).replaceAll("\\s+", " ").trim();
+        return location + ": error: " + message;
+    }
+
+    private void printCompileError(String message) {
+        System.err.println(DIAGNOSTIC_PREFIX + message);
+    }
+
+    private void printCompileSuccess(long startedAt, String detail) {
+        long elapsedMillis = Duration.ofNanos(System.nanoTime() - startedAt).toMillis();
+        System.out.println(
+            STATUS_PREFIX
+                + "Build successful at "
+                + LocalDateTime.now().format(TIMESTAMP_FORMAT)
+                + " ("
+                + elapsedMillis
+                + " ms). "
+                + detail
+        );
     }
 }

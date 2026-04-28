@@ -1,4 +1,4 @@
-export type TabId = "driverStation" | "configuration" | "onbotJava" | "field";
+export type TabId = "driverStation" | "configuration" | "onbotJava";
 export type SimStatus = "stopped" | "initialized" | "running";
 
 export type RobotState = {
@@ -16,6 +16,11 @@ export type OpMode = {
   id: string;
   name: string;
   modeType: string;
+};
+
+export type TelemetryItem = {
+  caption: string;
+  value: string;
 };
 
 export type GamepadNumber = 1 | 2;

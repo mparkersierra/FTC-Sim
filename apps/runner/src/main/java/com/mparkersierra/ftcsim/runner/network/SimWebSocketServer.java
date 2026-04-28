@@ -10,6 +10,7 @@ import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.server.WebSocketServer;
 
 import java.net.InetSocketAddress;
+import java.util.Map;
 
 public class SimWebSocketServer extends WebSocketServer {
     private final OpModeManager opModeManager;
@@ -174,8 +175,60 @@ public class SimWebSocketServer extends WebSocketServer {
         broadcast("{\"type\":\"robotState\",\"x\":" + x + ",\"y\":" + y + ",\"heading\":" + headingDegrees + "}");
     }
 
+    public void broadcastTelemetry(Map<String, Object> data) {
+        StringBuilder json = new StringBuilder();
+        json.append("{\"type\":\"telemetry\",\"timestamp\":")
+            .append(System.currentTimeMillis())
+            .append(",\"items\":[");
+
+        boolean first = true;
+        for (Map.Entry<String, Object> entry : data.entrySet()) {
+            if (!first) json.append(",");
+            first = false;
+
+            json.append("{\"caption\":\"")
+                .append(escapeJson(entry.getKey()))
+                .append("\",\"value\":\"")
+                .append(escapeJson(String.valueOf(entry.getValue())))
+                .append("\"}");
+        }
+
+        json.append("]}");
+        broadcast(json.toString());
+    }
+
     private void broadcastOpModeStopped() {
         broadcast("{\"type\":\"opModeStopped\"}");
+    }
+
+    private String escapeJson(String value) {
+        StringBuilder escaped = new StringBuilder();
+
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+
+            if (c == '"') {
+                escaped.append("\\\"");
+            } else if (c == '\\') {
+                escaped.append("\\\\");
+            } else if (c == '\b') {
+                escaped.append("\\b");
+            } else if (c == '\f') {
+                escaped.append("\\f");
+            } else if (c == '\n') {
+                escaped.append("\\n");
+            } else if (c == '\r') {
+                escaped.append("\\r");
+            } else if (c == '\t') {
+                escaped.append("\\t");
+            } else if (c < 0x20) {
+                escaped.append(String.format("\\u%04x", (int) c));
+            } else {
+                escaped.append(c);
+            }
+        }
+
+        return escaped.toString();
     }
 
     @Override public void onClose(WebSocket conn, int code, String reason, boolean remote) {}

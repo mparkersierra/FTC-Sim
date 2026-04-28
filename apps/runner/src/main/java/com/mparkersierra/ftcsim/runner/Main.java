@@ -13,13 +13,17 @@ import org.firstinspires.ftc.robotcore.external.Telemetry;
 import java.nio.file.Path;
 
 public class Main {
+    private static final String TEAMCODE_COMPILE_ERROR_PREFIX = "TEAMCODE_COMPILE_ERROR: ";
+
     public static void main(String[] args) throws Exception {
         TeamCodeWorkspace teamCodeWorkspace = new TeamCodeWorkspace(teamCodeRoot(args));
         System.out.println("Using TeamCode workspace: " + teamCodeWorkspace.root());
 
         boolean compiled = new TeamCodeCompiler(teamCodeWorkspace).compile();
         if (!compiled) {
-            System.err.println("TeamCode compilation failed. Starting runner without updated op modes.");
+            System.err.println(
+                TEAMCODE_COMPILE_ERROR_PREFIX + "TeamCode compilation failed. Starting runner without updated op modes."
+            );
             if (hasFlag(args, "--compile-only")) {
                 System.exit(1);
             }
@@ -36,10 +40,11 @@ public class Main {
         hardwareRegistry.addDevice("DcMotor", "leftBack");
         hardwareRegistry.addDevice("DcMotor", "rightBack");
 
+        Telemetry telemetry = new Telemetry();
         OpModeManager opModeManager =
             new OpModeManager(
                 hardwareRegistry.getHardwareMap(),
-                new Telemetry(),
+                telemetry,
                 new OpModeScanner(teamCodeWorkspace.classOutputRoot())
             );
 
@@ -47,6 +52,7 @@ public class Main {
 
         SimWebSocketServer server =
             new SimWebSocketServer(8080, opModeManager, robotPose, hardwareRegistry);
+        telemetry.setSink(server::broadcastTelemetry);
             
         server.setReuseAddr(true); 
         server.start();
