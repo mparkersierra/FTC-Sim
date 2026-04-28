@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-APP_DIR="${REPO_ROOT}/apps/sim-app"
+APP_DIR="${REPO_ROOT}/apps/desktop"
 MACOS_BUNDLE_DIR="${APP_DIR}/src-tauri/target/release/bundle/macos"
 APP_BUNDLE="${MACOS_BUNDLE_DIR}/FTC Sim.app"
 STAGING_DIR="${REPO_ROOT}/dmg-staging"

@@ -1,0 +1,32 @@
+plugins {
+    id "application"
+}
+
+dependencies {
+    implementation project(":libs:ftc-sdk-shim")
+    implementation project(":libs:sim-core")
+    implementation "org.java-websocket:Java-WebSocket:1.5.6"
+}
+
+application {
+    mainClass = "com.mparkersierra.ftcsim.runner.Main"
+}
+
+run {
+    standardInput = System.in
+    workingDir = rootProject.projectDir
+}
+
+jar {
+    dependsOn configurations.runtimeClasspath
+
+    manifest {
+        attributes "Main-Class": application.mainClass.get()
+    }
+
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+}
