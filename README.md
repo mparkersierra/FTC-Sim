@@ -22,7 +22,7 @@ See `docs/repository-layout.md` for more detail.
 Run the Java simulator runner:
 
 ```sh
-./gradlew :apps:runner:run
+./gradlew :apps:runner:build
 ```
 
 Work on the desktop app:
