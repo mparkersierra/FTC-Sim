@@ -20,10 +20,16 @@ public abstract class LinearOpMode extends OpMode {
         try {
             System.out.println("Waiting for START...");
             startLatch.await();
+            if (isStopRequested()) {
+                throw new OpModeStopRequestedException();
+            }
             active = true;
             System.out.println("STARTED");
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            if (isStopRequested()) {
+                throw new OpModeStopRequestedException();
+            }
         }
     }
 
@@ -41,13 +47,25 @@ public abstract class LinearOpMode extends OpMode {
     public void requestOpModeStop() {
         super.requestOpModeStop();
         active = false;
+        startLatch.countDown();
     }
 
     public void sleep(long milliseconds) {
+        if (isStopRequested()) {
+            throw new OpModeStopRequestedException();
+        }
+
         try {
             Thread.sleep(milliseconds);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            if (isStopRequested()) {
+                throw new OpModeStopRequestedException();
+            }
+        }
+
+        if (isStopRequested()) {
+            throw new OpModeStopRequestedException();
         }
     }
 }

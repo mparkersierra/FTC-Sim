@@ -54,6 +54,9 @@ public abstract class OpMode {
     }
 
     public void idle() {
+        if (isStopRequested()) {
+            throw new OpModeStopRequestedException();
+        }
         Thread.yield();
     }
 

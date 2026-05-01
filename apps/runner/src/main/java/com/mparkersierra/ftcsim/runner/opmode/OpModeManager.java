@@ -1,7 +1,9 @@
 package com.mparkersierra.ftcsim.runner.opmode;
 
+import com.mparkersierra.ftcsim.runner.hardware.SimHardwareRegistry;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
+import com.qualcomm.robotcore.eventloop.opmode.OpModeStopRequestedException;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 
@@ -11,6 +13,7 @@ public class OpModeManager {
     private static final long LOOP_INTERVAL_MILLIS = 20;
 
     private final HardwareMap hardwareMap;
+    private final SimHardwareRegistry hardwareRegistry;
     private final Telemetry telemetry;
     private final OpModeScanner opModeScanner;
 
@@ -18,8 +21,9 @@ public class OpModeManager {
     private Thread opModeThread;
     private Runnable stopListener;
 
-    public OpModeManager(HardwareMap hardwareMap, Telemetry telemetry, OpModeScanner opModeScanner) {
-        this.hardwareMap = hardwareMap;
+    public OpModeManager(SimHardwareRegistry hardwareRegistry, Telemetry telemetry, OpModeScanner opModeScanner) {
+        this.hardwareRegistry = hardwareRegistry;
+        this.hardwareMap = hardwareRegistry.getHardwareMap();
         this.telemetry = telemetry;
         this.opModeScanner = opModeScanner;
     }
@@ -75,6 +79,12 @@ public class OpModeManager {
             currentOpMode.stop();
         }
 
+        hardwareRegistry.stopAllMotors();
+
+        if (opModeThread != null) {
+            opModeThread.interrupt();
+        }
+
         clearCurrentOpMode();
 
         if (hadOpMode) {
@@ -89,6 +99,8 @@ public class OpModeManager {
             } else {
                 runIterativeOpMode(opMode);
             }
+        } catch (OpModeStopRequestedException ignored) {
+            // LinearOpMode uses this to unwind user code when STOP is pressed.
         } catch (Throwable t) {
             t.printStackTrace();
         } finally {
@@ -135,6 +147,7 @@ public class OpModeManager {
 
         opMode.requestOpModeStop();
         opMode.stop();
+        hardwareRegistry.stopAllMotors();
         clearCurrentOpMode();
         notifyStopped();
     }

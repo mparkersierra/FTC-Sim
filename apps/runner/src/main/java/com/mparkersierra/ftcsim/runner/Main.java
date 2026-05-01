@@ -43,7 +43,7 @@ public class Main {
         Telemetry telemetry = new Telemetry();
         OpModeManager opModeManager =
             new OpModeManager(
-                hardwareRegistry.getHardwareMap(),
+                hardwareRegistry,
                 telemetry,
                 new OpModeScanner(teamCodeWorkspace.classOutputRoot())
             );

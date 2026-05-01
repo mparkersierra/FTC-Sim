@@ -32,6 +32,12 @@ public class SimHardwareRegistry {
         return motors;
     }
 
+    public void stopAllMotors() {
+        for (DcMotor motor : motors.values()) {
+            motor.setPower(0.0);
+        }
+    }
+
     public DcMotor getMotor(String name) {
         return motors.get(name);
     }
