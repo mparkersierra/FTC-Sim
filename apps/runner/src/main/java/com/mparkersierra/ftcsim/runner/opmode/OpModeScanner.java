@@ -1,6 +1,7 @@
 package com.mparkersierra.ftcsim.runner.opmode;
 
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
 import java.io.File;
@@ -76,6 +77,10 @@ public class OpModeScanner {
 
             TeleOp teleOp = clazz.getAnnotation(TeleOp.class);
             Autonomous autonomous = clazz.getAnnotation(Autonomous.class);
+
+            if (!OpMode.class.isAssignableFrom(clazz)) {
+                return;
+            }
 
             if (teleOp != null) {
                 results.add(new OpModeInfo(

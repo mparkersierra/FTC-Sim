@@ -1,7 +1,7 @@
 package com.mparkersierra.ftcsim.runner.input;
 
 import com.mparkersierra.ftcsim.runner.opmode.OpModeManager;
-import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.hardware.Gamepad;
 
 import java.util.HashSet;
@@ -47,7 +47,7 @@ public class BrowserGamepadController {
     }
 
     public void handleGamepadInput(int gamepadNumber, String control, boolean pressed) {
-        LinearOpMode opMode = opModeManager.getCurrentOpMode();
+        OpMode opMode = opModeManager.getCurrentOpMode();
         if (opMode == null) return;
 
         String id = gamepadNumber + ":" + control;

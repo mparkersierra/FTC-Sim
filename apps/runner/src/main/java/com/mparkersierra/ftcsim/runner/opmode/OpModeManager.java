@@ -1,17 +1,20 @@
 package com.mparkersierra.ftcsim.runner.opmode;
 
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 
 import java.util.List;
 
 public class OpModeManager {
+    private static final long LOOP_INTERVAL_MILLIS = 20;
+
     private final HardwareMap hardwareMap;
     private final Telemetry telemetry;
     private final OpModeScanner opModeScanner;
 
-    private LinearOpMode currentOpMode;
+    private OpMode currentOpMode;
     private Thread opModeThread;
     private Runnable stopListener;
 
@@ -25,7 +28,7 @@ public class OpModeManager {
         return opModeScanner.scan();
     }
 
-    public synchronized LinearOpMode getCurrentOpMode() {
+    public synchronized OpMode getCurrentOpMode() {
         return currentOpMode;
     }
 
@@ -39,7 +42,7 @@ public class OpModeManager {
         for (OpModeInfo info : getOpModes()) {
             if (info.id.equals(opModeId)) {
                 try {
-                    LinearOpMode opMode = (LinearOpMode) info.clazz.getDeclaredConstructor().newInstance();
+                    OpMode opMode = (OpMode) info.clazz.getDeclaredConstructor().newInstance();
                     opMode.hardwareMap = hardwareMap;
                     opMode.telemetry = telemetry;
 
@@ -69,6 +72,7 @@ public class OpModeManager {
 
         if (currentOpMode != null) {
             currentOpMode.requestOpModeStop();
+            currentOpMode.stop();
         }
 
         clearCurrentOpMode();
@@ -78,9 +82,13 @@ public class OpModeManager {
         }
     }
 
-    private void runOpMode(LinearOpMode opMode) {
+    private void runOpMode(OpMode opMode) {
         try {
-            opMode.runOpMode();
+            if (opMode instanceof LinearOpMode) {
+                ((LinearOpMode) opMode).runOpMode();
+            } else {
+                runIterativeOpMode(opMode);
+            }
         } catch (Throwable t) {
             t.printStackTrace();
         } finally {
@@ -88,12 +96,45 @@ public class OpModeManager {
         }
     }
 
-    private synchronized void handleOpModeFinished(LinearOpMode opMode, Thread thread) {
+    private void runIterativeOpMode(OpMode opMode) {
+        opMode.init();
+
+        while (isCurrent(opMode) && !opMode.isStarted() && !opMode.isStopRequested()) {
+            opMode.init_loop();
+            sleepLoopInterval();
+        }
+
+        if (!isCurrent(opMode) || opMode.isStopRequested()) {
+            return;
+        }
+
+        opMode.start();
+
+        while (isCurrent(opMode) && !opMode.isStopRequested()) {
+            opMode.loop();
+            sleepLoopInterval();
+        }
+    }
+
+    private synchronized boolean isCurrent(OpMode opMode) {
+        return currentOpMode == opMode;
+    }
+
+    private void sleepLoopInterval() {
+        try {
+            Thread.sleep(LOOP_INTERVAL_MILLIS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private synchronized void handleOpModeFinished(OpMode opMode, Thread thread) {
         if (currentOpMode != opMode || opModeThread != thread) {
             return;
         }
 
         opMode.requestOpModeStop();
+        opMode.stop();
         clearCurrentOpMode();
         notifyStopped();
     }

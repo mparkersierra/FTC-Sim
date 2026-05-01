@@ -1,22 +1,20 @@
 package com.qualcomm.robotcore.eventloop.opmode;
 
-import com.qualcomm.robotcore.hardware.Gamepad;
-import com.qualcomm.robotcore.hardware.HardwareMap;
-import org.firstinspires.ftc.robotcore.external.Telemetry;
-
 import java.util.concurrent.CountDownLatch;
 
-public abstract class LinearOpMode {
-    public HardwareMap hardwareMap;
-    public Telemetry telemetry;
-
-    public Gamepad gamepad1 = new Gamepad();
-    public Gamepad gamepad2 = new Gamepad();
-
+public abstract class LinearOpMode extends OpMode {
     private volatile boolean active = false;
     private final CountDownLatch startLatch = new CountDownLatch(1);
 
     public abstract void runOpMode();
+
+    @Override
+    public final void init() {
+    }
+
+    @Override
+    public final void loop() {
+    }
 
     public void waitForStart() {
         try {
@@ -29,15 +27,19 @@ public abstract class LinearOpMode {
         }
     }
 
+    @Override
     public void internalStart() {
+        super.internalStart();
         startLatch.countDown();
     }
 
     public boolean opModeIsActive() {
-        return active;
+        return active && !isStopRequested();
     }
 
+    @Override
     public void requestOpModeStop() {
+        super.requestOpModeStop();
         active = false;
     }
 
