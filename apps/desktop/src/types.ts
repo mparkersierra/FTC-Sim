@@ -70,6 +70,7 @@ export type TeamCodeContextMenu =
     };
 
 export type TeamCodeFileTemplate = "java_class" | "autonomous" | "teleop";
+export type TeamCodeOpModeBase = "linear" | "iterative";
 
 export type TeamCodeSelection =
   | {
@@ -85,6 +86,7 @@ export type TeamCodeDialog =
   | {
       kind: "createFile";
       parentFolder: string;
+      opModeBase: TeamCodeOpModeBase;
       template: TeamCodeFileTemplate;
       value: string;
     }
