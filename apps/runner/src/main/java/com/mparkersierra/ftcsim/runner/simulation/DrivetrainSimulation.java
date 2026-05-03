@@ -4,8 +4,8 @@ import com.mparkersierra.ftcsim.runner.hardware.SimHardwareRegistry;
 import com.qualcomm.robotcore.hardware.DcMotor;
 
 public class DrivetrainSimulation {
-    private static final double MAX_SPEED = 1;
-    private static final double MAX_TURN_SPEED = 1;
+    private static final double MAX_SPEED = 1.5;
+    private static final double MAX_TURN_SPEED = 1.5;
     private static final long TICK_MS = 20;
 
     private final SimHardwareRegistry hardwareRegistry;

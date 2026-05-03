@@ -1,9 +1,6 @@
 import type { GamepadControl, GamepadMappingConfig, HardwareDevice, TeamCodeFileTemplate } from "./types";
 
 export const FIELD_SCALE = 100;
-export const ROBOT_HALF_SIZE = 35;
-export const ROTATION_HANDLE_LENGTH = 70;
-export const ROTATION_HANDLE_RADIUS = 9;
 export const MIN_TERMINAL_HEIGHT = 0;
 export const MAX_TERMINAL_HEIGHT = 520;
 

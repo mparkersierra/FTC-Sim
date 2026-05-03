@@ -1,11 +1,9 @@
 import { type Dispatch, type RefObject, type SetStateAction, useEffect } from "react";
-import {
-  FIELD_SCALE,
-  ROBOT_HALF_SIZE,
-  ROTATION_HANDLE_LENGTH,
-  ROTATION_HANDLE_RADIUS,
-} from "../config";
+import { FIELD_SCALE } from "../config";
 import type { RobotState, SimStatus, TabId } from "../types";
+
+const FIELD_BACKGROUND_URL = "/assets/simulator/decode-field.png";
+const ROBOT_FIELD_FRACTION = 1 / 8;
 
 type FieldDragState = {
   draggingRobot: boolean;
@@ -39,6 +37,10 @@ export function useFieldCanvas({
     const context = canvas.getContext("2d");
     if (!context) return;
 
+    const fieldBackground = new Image();
+    fieldBackground.src = FIELD_BACKGROUND_URL;
+    fieldBackground.onload = () => draw();
+
     const getCanvasPoint = (event: PointerEvent) => {
       const rect = canvas.getBoundingClientRect();
       return {
@@ -52,61 +54,61 @@ export function useFieldCanvas({
       y: canvas.height / 2 - state.y * FIELD_SCALE,
     });
 
+    const robotSize = () => canvas.width * ROBOT_FIELD_FRACTION;
+    const robotHalfSize = () => robotSize() / 2;
+    const rotationHandleLength = () => robotSize();
+    const rotationHandleRadius = () => Math.max(7, robotSize() * 0.13);
+
     const rotationHandlePosition = (state: RobotState) => {
       const position = robotScreenPosition(state);
       return {
-        x: position.x - Math.sin(state.heading) * ROTATION_HANDLE_LENGTH,
-        y: position.y - Math.cos(state.heading) * ROTATION_HANDLE_LENGTH,
+        x: position.x - Math.sin(state.heading) * rotationHandleLength(),
+        y: position.y - Math.cos(state.heading) * rotationHandleLength(),
       };
     };
 
     const draw = () => {
       context.clearRect(0, 0, canvas.width, canvas.height);
-      context.fillStyle = "#2f6f3e";
-      context.fillRect(0, 0, canvas.width, canvas.height);
-
-      context.strokeStyle = "rgba(255, 255, 255, 0.18)";
-      context.lineWidth = 1;
-      for (let x = canvas.width / 2 % FIELD_SCALE; x < canvas.width; x += FIELD_SCALE) {
-        context.beginPath();
-        context.moveTo(x, 0);
-        context.lineTo(x, canvas.height);
-        context.stroke();
-      }
-      for (let y = canvas.height / 2 % FIELD_SCALE; y < canvas.height; y += FIELD_SCALE) {
-        context.beginPath();
-        context.moveTo(0, y);
-        context.lineTo(canvas.width, y);
-        context.stroke();
+      if (fieldBackground.complete && fieldBackground.naturalWidth > 0) {
+        context.drawImage(fieldBackground, 0, 0, canvas.width, canvas.height);
+      } else {
+        context.fillStyle = "#2f6f3e";
+        context.fillRect(0, 0, canvas.width, canvas.height);
       }
 
       const state = robotRef.current;
       const position = robotScreenPosition(state);
-      const handle = rotationHandlePosition(state);
+      const halfSize = robotHalfSize();
+      const size = robotSize();
 
       context.save();
       context.translate(position.x, position.y);
       context.rotate(-state.heading);
       context.fillStyle = "#d7dce2";
       context.strokeStyle = "#111";
-      context.lineWidth = 3;
-      context.fillRect(-ROBOT_HALF_SIZE, -ROBOT_HALF_SIZE, ROBOT_HALF_SIZE * 2, ROBOT_HALF_SIZE * 2);
-      context.strokeRect(-ROBOT_HALF_SIZE, -ROBOT_HALF_SIZE, ROBOT_HALF_SIZE * 2, ROBOT_HALF_SIZE * 2);
+      context.lineWidth = Math.max(2, size * 0.04);
+      context.fillRect(-halfSize, -halfSize, size, size);
+      context.strokeRect(-halfSize, -halfSize, size, size);
       context.fillStyle = "#e64b3c";
-      context.fillRect(-10, -ROBOT_HALF_SIZE, 20, 15);
+      context.fillRect(-size * 0.14, -halfSize, size * 0.28, size * 0.21);
       context.restore();
 
-      context.strokeStyle = "#f7d84a";
-      context.lineWidth = 2;
-      context.beginPath();
-      context.moveTo(position.x, position.y);
-      context.lineTo(handle.x, handle.y);
-      context.stroke();
+      if (simStatusRef.current === "stopped") {
+        const handle = rotationHandlePosition(state);
+        const handleRadius = rotationHandleRadius();
 
-      context.fillStyle = "#f7d84a";
-      context.beginPath();
-      context.arc(handle.x, handle.y, ROTATION_HANDLE_RADIUS, 0, Math.PI * 2);
-      context.fill();
+        context.strokeStyle = "#f7d84a";
+        context.lineWidth = Math.max(2, size * 0.03);
+        context.beginPath();
+        context.moveTo(position.x, position.y);
+        context.lineTo(handle.x, handle.y);
+        context.stroke();
+
+        context.fillStyle = "#f7d84a";
+        context.beginPath();
+        context.arc(handle.x, handle.y, handleRadius, 0, Math.PI * 2);
+        context.fill();
+      }
     };
 
     const resize = () => {
@@ -124,17 +126,19 @@ export function useFieldCanvas({
       const state = robotRef.current;
       const position = robotScreenPosition(state);
       const handle = rotationHandlePosition(state);
+      const halfSize = robotHalfSize();
+      const handleRadius = rotationHandleRadius();
       const handleDistance = Math.hypot(point.x - handle.x, point.y - handle.y);
       const robotDistanceX = Math.abs(point.x - position.x);
       const robotDistanceY = Math.abs(point.y - position.y);
 
-      if (handleDistance <= ROTATION_HANDLE_RADIUS + 8) {
+      if (handleDistance <= handleRadius + 8) {
         dragStateRef.current.rotatingRobot = true;
         canvas.setPointerCapture(event.pointerId);
         return;
       }
 
-      if (robotDistanceX <= ROBOT_HALF_SIZE && robotDistanceY <= ROBOT_HALF_SIZE) {
+      if (robotDistanceX <= halfSize && robotDistanceY <= halfSize) {
         dragStateRef.current.draggingRobot = true;
         dragStateRef.current.dragOffsetX = point.x - position.x;
         dragStateRef.current.dragOffsetY = point.y - position.y;
