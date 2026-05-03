@@ -9,6 +9,7 @@ public class Telemetry {
     }
 
     private final Map<String, Object> data = new LinkedHashMap<>();
+    private Map<String, Object> pendingSnapshot;
     private Sink sink;
 
     public synchronized void setSink(Sink sink) {
@@ -20,14 +21,26 @@ public class Telemetry {
     }
 
     public synchronized void update() {
-        Map<String, Object> snapshot = new LinkedHashMap<>(data);
+        pendingSnapshot = new LinkedHashMap<>(data);
+        data.clear();
+    }
 
-        try {
-            if (sink != null) {
-                sink.accept(snapshot);
+    public void flush() {
+        Map<String, Object> snapshot;
+        Sink currentSink;
+
+        synchronized (this) {
+            if (pendingSnapshot == null) {
+                return;
             }
-        } finally {
-            data.clear();
+
+            snapshot = pendingSnapshot;
+            pendingSnapshot = null;
+            currentSink = sink;
+        }
+
+        if (currentSink != null) {
+            currentSink.accept(snapshot);
         }
     }
 }

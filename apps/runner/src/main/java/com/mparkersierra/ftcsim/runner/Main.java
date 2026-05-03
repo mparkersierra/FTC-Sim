@@ -11,9 +11,13 @@ import com.mparkersierra.ftcsim.runner.teamcode.TeamCodeWorkspace;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 
 import java.nio.file.Path;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class Main {
     private static final String TEAMCODE_COMPILE_ERROR_PREFIX = "TEAMCODE_COMPILE_ERROR: ";
+    private static final long TELEMETRY_BROADCAST_INTERVAL_MILLIS = 50;
 
     public static void main(String[] args) throws Exception {
         TeamCodeWorkspace teamCodeWorkspace = new TeamCodeWorkspace(teamCodeRoot(args));
@@ -53,11 +57,42 @@ public class Main {
         SimWebSocketServer server =
             new SimWebSocketServer(8080, opModeManager, robotPose, hardwareRegistry);
         telemetry.setSink(server::broadcastTelemetry);
+        ScheduledExecutorService telemetryBroadcaster = startTelemetryBroadcaster(telemetry);
             
         server.setReuseAddr(true); 
         server.start();
 
-        new DrivetrainSimulation(hardwareRegistry, robotPose, server::broadcastRobotState).run();
+        try {
+            new DrivetrainSimulation(hardwareRegistry, robotPose, server::broadcastRobotState).run();
+        } finally {
+            telemetryBroadcaster.shutdownNow();
+        }
+    }
+
+    private static ScheduledExecutorService startTelemetryBroadcaster(Telemetry telemetry) {
+        ScheduledExecutorService executor =
+            Executors.newSingleThreadScheduledExecutor(runnable -> {
+                Thread thread = new Thread(runnable, "TelemetryBroadcaster");
+                thread.setDaemon(true);
+                return thread;
+            });
+
+        executor.scheduleAtFixedRate(
+            () -> flushTelemetry(telemetry),
+            0,
+            TELEMETRY_BROADCAST_INTERVAL_MILLIS,
+            TimeUnit.MILLISECONDS
+        );
+
+        return executor;
+    }
+
+    private static void flushTelemetry(Telemetry telemetry) {
+        try {
+            telemetry.flush();
+        } catch (RuntimeException e) {
+            e.printStackTrace();
+        }
     }
 
     private static Path teamCodeRoot(String[] args) {

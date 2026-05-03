@@ -534,6 +534,12 @@ export const generatedFtcJavaApi: GeneratedJavaType[] =
         "label": "update",
         "detail": "void update()",
         "insertText": "update($1)"
+      },
+      {
+        "kind": "method",
+        "label": "flush",
+        "detail": "void flush()",
+        "insertText": "flush($1)"
       }
     ]
   }
