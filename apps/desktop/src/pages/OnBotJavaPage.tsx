@@ -6,7 +6,9 @@ import type {
 } from "react";
 import { useRef, useState } from "react";
 import Editor from "@monaco-editor/react";
+import type { OnMount } from "@monaco-editor/react";
 import { teamCodeFileTemplates } from "../config";
+import { registerFtcJavaCompletions } from "../editor/ftcJavaCompletions";
 import type {
   TabId,
   TeamCodeContextMenu,
@@ -38,6 +40,7 @@ type OnBotJavaPageProps = {
   teamCodeFilesByFolder: Record<TeamCodeFolder, string[]>;
   teamCodeFolders: string[];
   teamCodeSelection: TeamCodeSelection;
+  teamCodeSourceTextByFile: Record<string, string>;
   terminalHeight: number;
   onCreateCodeFile: () => void;
   onCreateCodeFileFromContextFolder: () => void;
@@ -87,6 +90,7 @@ export function OnBotJavaPage({
   teamCodeFilesByFolder,
   teamCodeFolders,
   teamCodeSelection,
+  teamCodeSourceTextByFile,
   terminalHeight,
   onCreateCodeFile,
   onCreateCodeFileFromContextFolder,
@@ -123,6 +127,14 @@ export function OnBotJavaPage({
   } | null>(null);
   const didPointerDragRef = useRef(false);
   const suppressNextClickRef = useRef(false);
+  const teamCodeSourceTextByFileRef = useRef(teamCodeSourceTextByFile);
+  teamCodeSourceTextByFileRef.current = teamCodeSourceTextByFile;
+
+  const handleEditorMount: OnMount = (_editor, monaco) => {
+    registerFtcJavaCompletions(monaco, {
+      getWorkspaceSources: () => teamCodeSourceTextByFileRef.current,
+    });
+  };
 
   const dragItemLabel = (item: TeamCodeDragItem) => {
     if (item.kind === "folder") return item.path.split("/").pop() ?? item.path;
@@ -387,6 +399,7 @@ export function OnBotJavaPage({
               height="100%"
               language="java"
               onChange={(value) => onSetCodeText(value ?? "")}
+              onMount={handleEditorMount}
               options={{
                 automaticLayout: true,
                 fontSize: 14,

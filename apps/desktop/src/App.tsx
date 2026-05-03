@@ -79,6 +79,7 @@ function App() {
   const [teamCodeDirectories, setTeamCodeDirectories] = useState<string[]>([]);
   const [openCodeFileTabs, setOpenCodeFileTabs] = useState<string[]>([]);
   const [codeTextByFile, setCodeTextByFile] = useState<Record<string, string>>({});
+  const [teamCodeSourceTextByFile, setTeamCodeSourceTextByFile] = useState<Record<string, string>>({});
   const [savedCodeTextByFile, setSavedCodeTextByFile] = useState<Record<string, string>>({});
   const [codeFileName, setCodeFileName] = useState("");
   const [codeText, setCodeText] = useState("");
@@ -135,6 +136,15 @@ function App() {
       ]);
       setTeamCodeFiles(files);
       setTeamCodeDirectories(directories);
+      const sourceEntries = await Promise.all(
+        files.map(async (fileName) => [
+          fileName,
+          await invoke<string>("read_teamcode_file", {
+            relativePath: fileName,
+          }),
+        ] as const),
+      );
+      setTeamCodeSourceTextByFile(Object.fromEntries(sourceEntries));
     } catch (error) {
       setCodeStatus(String(error));
     }
@@ -163,6 +173,7 @@ function App() {
 
       setOpenCodeFileTabs((current) => (current.includes(fileName) ? current : [...current, fileName]));
       setCodeTextByFile((current) => ({ ...current, [fileName]: contents }));
+      setTeamCodeSourceTextByFile((current) => ({ ...current, [fileName]: contents }));
       setSavedCodeTextByFile((current) =>
         cachedContents === undefined ? { ...current, [fileName]: contents } : current,
       );
@@ -242,6 +253,11 @@ function App() {
       delete next[previousPath];
       return next;
     });
+    setTeamCodeSourceTextByFile((current) => {
+      const next = { ...current, [nextPath]: contents };
+      delete next[previousPath];
+      return next;
+    });
     setSavedCodeTextByFile((current) => {
       const next = { ...current, [nextPath]: contents };
       delete next[previousPath];
@@ -271,6 +287,14 @@ function App() {
     );
 
     setCodeTextByFile((current) => {
+      const next = { ...current };
+      for (const buffer of refreshedBuffers) {
+        delete next[buffer.previousPath];
+        next[buffer.nextPath] = buffer.contents;
+      }
+      return next;
+    });
+    setTeamCodeSourceTextByFile((current) => {
       const next = { ...current };
       for (const buffer of refreshedBuffers) {
         delete next[buffer.previousPath];
@@ -314,6 +338,7 @@ function App() {
         contents,
       });
       setCodeTextByFile((current) => ({ ...current, [fileName]: contents }));
+      setTeamCodeSourceTextByFile((current) => ({ ...current, [fileName]: contents }));
       setSavedCodeTextByFile((current) => ({ ...current, [fileName]: contents }));
       setCodeStatus("Saved");
       return true;
@@ -336,6 +361,7 @@ function App() {
         contents: codeText,
       });
       setCodeTextByFile((current) => ({ ...current, [codeFileName]: codeText }));
+      setTeamCodeSourceTextByFile((current) => ({ ...current, [codeFileName]: codeText }));
       setSavedCodeTextByFile((current) => ({ ...current, [codeFileName]: codeText }));
 
       setCodeStatus("Saved. Restarting sim runner to compile TeamCode...");
@@ -487,6 +513,7 @@ function App() {
         setCodeText(contents);
         setOpenCodeFileTabs((current) => (current.includes(relativePath) ? current : [...current, relativePath]));
         setCodeTextByFile((current) => ({ ...current, [relativePath]: contents }));
+        setTeamCodeSourceTextByFile((current) => ({ ...current, [relativePath]: contents }));
         setSavedCodeTextByFile((current) => ({ ...current, [relativePath]: contents }));
         setTeamCodeSelection({ kind: "file", path: relativePath });
         setExpandedTeamCodeFolders((current) => {
@@ -566,6 +593,11 @@ function App() {
             delete next[dialog.path];
             return next;
           });
+          setTeamCodeSourceTextByFile((current) => {
+            const next = { ...current };
+            delete next[dialog.path];
+            return next;
+          });
           setSavedCodeTextByFile((current) => {
             const next = { ...current };
             delete next[dialog.path];
@@ -582,6 +614,15 @@ function App() {
           await invoke<string>("delete_teamcode_folder", { relativePath: dialog.path });
           setOpenCodeFileTabs((current) => current.filter((tab) => !tab.startsWith(`${dialog.path}/`)));
           setCodeTextByFile((current) => {
+            const next = { ...current };
+            for (const path of Object.keys(next)) {
+              if (path.startsWith(`${dialog.path}/`)) {
+                delete next[path];
+              }
+            }
+            return next;
+          });
+          setTeamCodeSourceTextByFile((current) => {
             const next = { ...current };
             for (const path of Object.keys(next)) {
               if (path.startsWith(`${dialog.path}/`)) {
@@ -686,6 +727,7 @@ function App() {
     setCodeText(value);
     if (codeFileName) {
       setCodeTextByFile((current) => ({ ...current, [codeFileName]: value }));
+      setTeamCodeSourceTextByFile((current) => ({ ...current, [codeFileName]: value }));
     }
   };
 
@@ -1164,6 +1206,7 @@ function App() {
         teamCodeFilesByFolder={teamCodeFilesByFolder}
         teamCodeFolders={teamCodeFolders}
         teamCodeSelection={teamCodeSelection}
+        teamCodeSourceTextByFile={teamCodeSourceTextByFile}
         terminalHeight={terminalHeight}
         onCreateCodeFile={createCodeFile}
         onCreateCodeFileFromContextFolder={createCodeFileFromContextFolder}

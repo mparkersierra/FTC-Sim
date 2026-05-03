@@ -4,11 +4,14 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
+    "generate:ftc-api": "node scripts/generate-ftc-java-api.mjs",
+    "dev": "npm run generate:ftc-api && vite",
+    "build": "npm run generate:ftc-api && tsc && vite build",
     "build:mac:dmg": "../../scripts/build-macos-dmg.sh",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "tauri:dev": "npm run generate:ftc-api && tauri dev",
+    "tauri:build": "npm run generate:ftc-api && tauri build"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
