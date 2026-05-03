@@ -5,13 +5,15 @@
   "type": "module",
   "scripts": {
     "generate:ftc-api": "node scripts/generate-ftc-java-api.mjs",
-    "dev": "npm run generate:ftc-api && vite",
-    "build": "npm run generate:ftc-api && tsc && vite build",
+    "generate:jdk-api": "node scripts/generate-jdk-java-api.mjs",
+    "generate:java-api": "npm run generate:ftc-api && npm run generate:jdk-api",
+    "dev": "npm run generate:java-api && vite",
+    "build": "npm run generate:java-api && tsc && vite build",
     "build:mac:dmg": "../../scripts/build-macos-dmg.sh",
     "preview": "vite preview",
     "tauri": "tauri",
-    "tauri:dev": "npm run generate:ftc-api && tauri dev",
-    "tauri:build": "npm run generate:ftc-api && tauri build"
+    "tauri:dev": "npm run generate:java-api && tauri dev",
+    "tauri:build": "npm run generate:java-api && tauri build"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",

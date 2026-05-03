@@ -1,5 +1,6 @@
 import type * as Monaco from "monaco-editor";
 import { generatedFtcJavaApi } from "./generatedFtcJavaApi";
+import { generatedJdkJavaApi } from "./generatedJdkJavaApi";
 import type { GeneratedJavaType } from "./generatedFtcJavaApi";
 
 type MonacoApi = typeof Monaco;
@@ -52,7 +53,7 @@ const ignoredCompletionMembers = new Set([
   "DcMotor.getAppliedPower",
 ]);
 
-const generatedJavaTypes: JavaType[] = generatedFtcJavaApi.map((type) => ({
+const generatedJavaTypes: JavaType[] = [...generatedFtcJavaApi, ...generatedJdkJavaApi].map((type) => ({
   ...type,
   members: type.members?.map((member) => ({
     ...member,
@@ -234,7 +235,7 @@ function memberCompletions(
 
 function inferExpressionType(source: string, expressionParts: string[]): JavaType | null {
   const [rootVariableName, ...memberNames] = expressionParts;
-  let currentType = inferVariableType(source, rootVariableName);
+  let currentType = inferVariableType(source, rootVariableName) ?? normalizeTypeName(rootVariableName);
 
   for (const memberName of memberNames) {
     const member = currentType ? membersForType(currentType).find((candidate) => candidate.label === memberName) : null;
@@ -478,7 +479,7 @@ function normalizeTypeName(typeName: string): JavaType | null {
 
 function importEditForType(monaco: MonacoApi, model: ITextModel, type: JavaType): Monaco.editor.ISingleEditOperation[] {
   const source = model.getValue();
-  if (source.includes(`import ${type.fullName};`) || source.includes(`${type.fullName}`)) {
+  if (type.fullName.startsWith("java.lang.") || source.includes(`import ${type.fullName};`) || source.includes(`${type.fullName}`)) {
     return [];
   }
 
