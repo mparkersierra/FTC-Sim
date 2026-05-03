@@ -38,3 +38,12 @@ Build the macOS DMG:
 cd apps/desktop
 npm run build:mac:dmg
 ```
+
+Clean local project:
+
+```sh
+lsof -ti tcp:8080 | xargs kill
+./gradlew :apps:runner:clean :apps:runner:build
+
+rm -rf node_modules/.vite dist
+```
