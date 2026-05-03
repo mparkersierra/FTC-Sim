@@ -2,6 +2,7 @@
 
 mod paths;
 mod runner;
+mod settings;
 mod teamcode;
 
 pub fn run() {
@@ -21,6 +22,8 @@ pub fn run() {
             teamcode::list_teamcode_files,
             teamcode::list_teamcode_directories,
             teamcode::read_teamcode_file,
+            settings::read_gamepad_mapping,
+            settings::save_gamepad_mapping,
             runner::read_runner_log,
             runner::restart_sim_runner
         ])

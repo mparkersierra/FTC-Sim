@@ -44,6 +44,31 @@ import type {
 } from "./types";
 import "./App.css";
 
+const gamepadNumbers: GamepadNumber[] = [1, 2];
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+const normalizeSavedGamepadMapping = (value: unknown): GamepadMappingConfig => {
+  const mapping: GamepadMappingConfig = { 1: {}, 2: {} };
+  if (!isRecord(value)) return mapping;
+
+  const validControls = new Set(gamepadControls.map((control) => control.id));
+
+  gamepadNumbers.forEach((gamepadNumber) => {
+    const savedGamepadMapping = value[String(gamepadNumber)];
+    if (!isRecord(savedGamepadMapping)) return;
+
+    Object.entries(savedGamepadMapping).forEach(([control, code]) => {
+      if (validControls.has(control as GamepadControl) && typeof code === "string" && code.length > 0) {
+        mapping[gamepadNumber][control as GamepadControl] = code;
+      }
+    });
+  });
+
+  return mapping;
+};
+
 function App() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
@@ -53,6 +78,7 @@ function App() {
   const activeTabRef = useRef<TabId>("driverStation");
   const activeBindingRef = useRef<ActiveBinding>(null);
   const mappingRef = useRef<GamepadMappingConfig>(defaultGamepadMapping);
+  const hasLoadedGamepadMappingRef = useRef(false);
   const pressedBindingsRef = useRef<Map<string, Binding>>(new Map());
   const dragStateRef = useRef({
     draggingRobot: false,
@@ -115,6 +141,45 @@ function App() {
 
   useEffect(() => {
     mappingRef.current = gamepadMappingConfig;
+  }, [gamepadMappingConfig]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadGamepadMapping = async () => {
+      try {
+        const savedMapping = await invoke<unknown | null>("read_gamepad_mapping");
+        if (cancelled) return;
+
+        if (savedMapping) {
+          const normalizedMapping = normalizeSavedGamepadMapping(savedMapping);
+          mappingRef.current = normalizedMapping;
+          setGamepadMappingConfig(normalizedMapping);
+        }
+      } catch (error) {
+        console.error(error);
+        setBindingHint(`Failed to load saved gamepad mapping: ${String(error)}`);
+      } finally {
+        if (!cancelled) {
+          hasLoadedGamepadMappingRef.current = true;
+        }
+      }
+    };
+
+    void loadGamepadMapping();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hasLoadedGamepadMappingRef.current) return;
+
+    invoke<void>("save_gamepad_mapping", { mapping: gamepadMappingConfig }).catch((error) => {
+      console.error(error);
+      setBindingHint(`Failed to save gamepad mapping: ${String(error)}`);
+    });
   }, [gamepadMappingConfig]);
 
   const send = useCallback((message: unknown) => {
