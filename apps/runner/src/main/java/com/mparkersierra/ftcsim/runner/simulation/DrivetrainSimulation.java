@@ -4,8 +4,8 @@ import com.mparkersierra.ftcsim.runner.hardware.SimHardwareRegistry;
 import com.qualcomm.robotcore.hardware.DcMotor;
 
 public class DrivetrainSimulation {
-    private static final double MAX_SPEED = 1.5;
-    private static final double MAX_TURN_SPEED = 1.5;
+    private static final double MAX_SPEED_INCHES_PER_SECOND = 15.0;
+    private static final double MAX_TURN_SPEED_RADIANS_PER_SECOND = 1.5;
     private static final long TICK_MS = 20;
 
     private final SimHardwareRegistry hardwareRegistry;
@@ -61,8 +61,8 @@ public class DrivetrainSimulation {
         double strafe = (-lf - rf + lb + rb) / 4.0;
         double turn = (lf + rf + lb + rb) / 4.0;
 
-        double robotVx = strafe * MAX_SPEED;
-        double robotVy = forward * MAX_SPEED;
+        double robotVx = strafe * MAX_SPEED_INCHES_PER_SECOND;
+        double robotVy = forward * MAX_SPEED_INCHES_PER_SECOND;
 
         double cos = Math.cos(robotPose.heading);
         double sin = Math.sin(robotPose.heading);
@@ -73,7 +73,7 @@ public class DrivetrainSimulation {
         robotPose.x += fieldVx * dt;
         robotPose.y += fieldVy * dt;
 
-        robotPose.heading += turn * MAX_TURN_SPEED * dt;
+        robotPose.heading += turn * MAX_TURN_SPEED_RADIANS_PER_SECOND * dt;
         robotPose.heading = Math.atan2(Math.sin(robotPose.heading), Math.cos(robotPose.heading));
     }
 }

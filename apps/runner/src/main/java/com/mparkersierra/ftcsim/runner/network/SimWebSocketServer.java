@@ -171,8 +171,8 @@ public class SimWebSocketServer extends WebSocketServer {
         return Integer.parseInt(json.substring(start, end));
     }
 
-    public void broadcastRobotState(double x, double y, double headingDegrees) {
-        broadcast("{\"type\":\"robotState\",\"x\":" + x + ",\"y\":" + y + ",\"heading\":" + headingDegrees + "}");
+    public void broadcastRobotState(double x, double y, double headingRadians) {
+        broadcast("{\"type\":\"robotState\",\"x\":" + x + ",\"y\":" + y + ",\"heading\":" + headingRadians + "}");
     }
 
     public void broadcastTelemetry(Map<String, Object> data) {

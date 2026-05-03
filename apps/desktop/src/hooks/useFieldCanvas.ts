@@ -1,9 +1,8 @@
 import { type Dispatch, type RefObject, type SetStateAction, useEffect } from "react";
-import { FIELD_SCALE } from "../config";
+import { FIELD_SIZE_INCHES, ROBOT_SIZE_INCHES } from "../config";
 import type { RobotState, SimStatus, TabId } from "../types";
 
 const FIELD_BACKGROUND_URL = "/assets/simulator/decode-field.png";
-const ROBOT_FIELD_FRACTION = 1 / 8;
 
 type FieldDragState = {
   draggingRobot: boolean;
@@ -49,12 +48,17 @@ export function useFieldCanvas({
       };
     };
 
-    const robotScreenPosition = (state: RobotState) => ({
-      x: canvas.width / 2 + state.x * FIELD_SCALE,
-      y: canvas.height / 2 - state.y * FIELD_SCALE,
-    });
+    const pixelsPerInch = () => canvas.width / FIELD_SIZE_INCHES;
 
-    const robotSize = () => canvas.width * ROBOT_FIELD_FRACTION;
+    const robotScreenPosition = (state: RobotState) => {
+      const scale = pixelsPerInch();
+      return {
+        x: canvas.width / 2 + state.x * scale,
+        y: canvas.height / 2 - state.y * scale,
+      };
+    };
+
+    const robotSize = () => ROBOT_SIZE_INCHES * pixelsPerInch();
     const robotHalfSize = () => robotSize() / 2;
     const rotationHandleLength = () => robotSize();
     const rotationHandleRadius = () => Math.max(7, robotSize() * 0.13);
@@ -161,10 +165,11 @@ export function useFieldCanvas({
       let nextRobot = current;
 
       if (dragState.draggingRobot) {
+        const scale = pixelsPerInch();
         nextRobot = {
           ...current,
-          x: (point.x - dragState.dragOffsetX - canvas.width / 2) / FIELD_SCALE,
-          y: (canvas.height / 2 - (point.y - dragState.dragOffsetY)) / FIELD_SCALE,
+          x: (point.x - dragState.dragOffsetX - canvas.width / 2) / scale,
+          y: (canvas.height / 2 - (point.y - dragState.dragOffsetY)) / scale,
         };
       }
 
