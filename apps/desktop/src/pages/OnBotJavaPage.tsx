@@ -15,6 +15,8 @@ import type {
   TeamCodeDialog,
   TeamCodeFileTemplate,
   TeamCodeFolder,
+  TeamCodeImportConflictAction,
+  TeamCodeImportConflictPrompt,
   TeamCodeOpModeBase,
   TeamCodeSelection,
 } from "../types";
@@ -26,6 +28,7 @@ type OnBotJavaPageProps = {
   codeFileName: string;
   codeStatus: string;
   codeText: string;
+  exportedTeamCodeZipPath: string;
   openCodeFileTabs: string[];
   pendingCloseCodeFileTab: string | null;
   expandedTeamCodeFolders: Record<TeamCodeFolder, boolean>;
@@ -39,6 +42,7 @@ type OnBotJavaPageProps = {
   teamCodeDialogTitle: string;
   teamCodeFilesByFolder: Record<TeamCodeFolder, string[]>;
   teamCodeFolders: string[];
+  teamCodeImportConflictPrompt: TeamCodeImportConflictPrompt | null;
   teamCodeSelection: TeamCodeSelection;
   teamCodeSourceTextByFile: Record<string, string>;
   terminalHeight: number;
@@ -50,16 +54,21 @@ type OnBotJavaPageProps = {
   onConfirmSaveAndCloseCodeFileTab: () => void;
   onDeleteTeamCodeItem: () => void;
   onDismissDialog: () => void;
+  onExportTeamCode: () => void;
+  onImportTeamCodeGithubRepoLink: (repoUrl: string) => void;
+  onImportTeamCodeZipFile: (file: File) => void;
   onLoadRunnerLog: () => void;
   onLoadTeamCodeFiles: () => void;
   onMoveTeamCodeItem: (item: TeamCodeDragItem, targetFolder: string) => void;
   onCloseCodeFileTab: (fileName: string) => void;
   onOpenCodeFile: (fileName: string) => void;
+  onOpenTeamCodeExport: () => void;
   onOpenTeamCodeContextMenu: (
     event: ReactMouseEvent<HTMLButtonElement>,
     menu: Omit<TeamCodeContextMenu, "x" | "y">,
   ) => void;
   onRenameTeamCodeItem: () => void;
+  onResolveTeamCodeImportConflict: (action: TeamCodeImportConflictAction) => void;
   onSaveCodeFile: () => void;
   onSaveCodeFileOnly: () => void;
   onSetCodeText: (value: string) => void;
@@ -69,6 +78,7 @@ type OnBotJavaPageProps = {
   onUpdateTeamCodeDialogOpModeBase: (opModeBase: TeamCodeOpModeBase) => void;
   onUpdateTeamCodeDialogTemplate: (template: TeamCodeFileTemplate) => void;
   onUpdateTeamCodeDialogValue: (value: string) => void;
+  onUpdateTeamCodeImportConflictRenamePath: (value: string) => void;
 };
 
 export function OnBotJavaPage({
@@ -76,6 +86,7 @@ export function OnBotJavaPage({
   codeFileName,
   codeStatus,
   codeText,
+  exportedTeamCodeZipPath,
   openCodeFileTabs,
   pendingCloseCodeFileTab,
   expandedTeamCodeFolders,
@@ -89,6 +100,7 @@ export function OnBotJavaPage({
   teamCodeDialogTitle,
   teamCodeFilesByFolder,
   teamCodeFolders,
+  teamCodeImportConflictPrompt,
   teamCodeSelection,
   teamCodeSourceTextByFile,
   terminalHeight,
@@ -100,13 +112,18 @@ export function OnBotJavaPage({
   onConfirmSaveAndCloseCodeFileTab,
   onDeleteTeamCodeItem,
   onDismissDialog,
+  onExportTeamCode,
+  onImportTeamCodeGithubRepoLink,
+  onImportTeamCodeZipFile,
   onLoadRunnerLog,
   onLoadTeamCodeFiles,
   onMoveTeamCodeItem,
   onCloseCodeFileTab,
   onOpenCodeFile,
+  onOpenTeamCodeExport,
   onOpenTeamCodeContextMenu,
   onRenameTeamCodeItem,
+  onResolveTeamCodeImportConflict,
   onSaveCodeFile,
   onSaveCodeFileOnly,
   onSetCodeText,
@@ -116,10 +133,15 @@ export function OnBotJavaPage({
   onUpdateTeamCodeDialogOpModeBase,
   onUpdateTeamCodeDialogTemplate,
   onUpdateTeamCodeDialogValue,
+  onUpdateTeamCodeImportConflictRenamePath,
 }: OnBotJavaPageProps) {
   const [draggedTeamCodeItem, setDraggedTeamCodeItem] = useState<TeamCodeDragItem | null>(null);
   const [dragPreviewPosition, setDragPreviewPosition] = useState<{ x: number; y: number } | null>(null);
   const [hoveredTeamCodeDropFolder, setHoveredTeamCodeDropFolder] = useState<string | null>(null);
+  const [isUploadMenuOpen, setIsUploadMenuOpen] = useState(false);
+  const [isGithubUploadFormOpen, setIsGithubUploadFormOpen] = useState(false);
+  const [githubUploadUrl, setGithubUploadUrl] = useState("");
+  const uploadZipInputRef = useRef<HTMLInputElement | null>(null);
   const activePointerDragRef = useRef<{
     item: TeamCodeDragItem;
     startX: number;
@@ -423,7 +445,14 @@ export function OnBotJavaPage({
           <section className="runner-output" style={{ height: terminalHeight }}>
             <div className="runner-output-title">
               <span>Terminal</span>
-              <span>{codeStatus}</span>
+              <span className="runner-output-status">
+                {codeStatus}
+                {exportedTeamCodeZipPath && (
+                  <button onClick={onOpenTeamCodeExport} type="button">
+                    Open Downloads
+                  </button>
+                )}
+              </span>
             </div>
             <pre>{runnerLog || "TeamCode compile errors will appear here."}</pre>
           </section>
@@ -444,6 +473,19 @@ export function OnBotJavaPage({
             </button>
             <button onClick={onLoadTeamCodeFiles} title="Refresh Files" type="button">
               R
+            </button>
+            <button onClick={onExportTeamCode} title="Export TeamCode Zip" type="button">
+              ZIP
+            </button>
+            <button
+              onClick={() => {
+                setIsGithubUploadFormOpen(false);
+                setIsUploadMenuOpen(true);
+              }}
+              title="Upload TeamCode"
+              type="button"
+            >
+              UP
             </button>
           </div>
 
@@ -577,6 +619,104 @@ export function OnBotJavaPage({
           </div>
         )}
 
+        {isUploadMenuOpen && (
+          <div
+            className="teamcode-dialog-backdrop"
+            onMouseDown={() => {
+              setIsUploadMenuOpen(false);
+              setIsGithubUploadFormOpen(false);
+            }}
+          >
+            <div className="teamcode-dialog" onMouseDown={(event) => event.stopPropagation()}>
+              <h2>Upload TeamCode</h2>
+              {isGithubUploadFormOpen ? (
+                <>
+                  <div className="teamcode-template-options teamcode-github-upload-field">
+                    <label htmlFor="teamcode-github-upload-url">GitHub repo link</label>
+                    <input
+                      autoFocus
+                      id="teamcode-github-upload-url"
+                      onChange={(event) => setGithubUploadUrl(event.target.value)}
+                      placeholder="https://github.com/FIRST-Tech-Challenge/FtcRobotController"
+                      value={githubUploadUrl}
+                    />
+                  </div>
+                  <div className="teamcode-dialog-actions">
+                    <button onClick={() => setIsGithubUploadFormOpen(false)} type="button">
+                      Back
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsUploadMenuOpen(false);
+                        setIsGithubUploadFormOpen(false);
+                        onImportTeamCodeGithubRepoLink(githubUploadUrl);
+                      }}
+                      type="button"
+                    >
+                      Upload
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="teamcode-upload-options">
+                    <button
+                      onClick={() => {
+                        uploadZipInputRef.current?.click();
+                      }}
+                      type="button"
+                    >
+                      Zip File
+                    </button>
+                    <button onClick={() => setIsGithubUploadFormOpen(true)} type="button">
+                      GitHub Repo Link
+                    </button>
+                  </div>
+                  <div className="teamcode-dialog-actions">
+                    <button onClick={() => setIsUploadMenuOpen(false)} type="button">
+                      Cancel
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {teamCodeImportConflictPrompt && (
+          <div className="teamcode-dialog-backdrop">
+            <div className="teamcode-dialog" onMouseDown={(event) => event.stopPropagation()}>
+              <h2>Import Conflict</h2>
+              <p>
+                {teamCodeImportConflictPrompt.path} already exists ({teamCodeImportConflictPrompt.index + 1} of{" "}
+                {teamCodeImportConflictPrompt.total}).
+              </p>
+              <div className="teamcode-template-options">
+                <label htmlFor="teamcode-import-rename-path">Rename to</label>
+                <input
+                  id="teamcode-import-rename-path"
+                  onChange={(event) => onUpdateTeamCodeImportConflictRenamePath(event.target.value)}
+                  value={teamCodeImportConflictPrompt.renamePath}
+                />
+              </div>
+              <div className="teamcode-dialog-actions teamcode-import-conflict-actions">
+                <button onClick={() => onResolveTeamCodeImportConflict("skip")} type="button">
+                  Do Not Add
+                </button>
+                <button onClick={() => onResolveTeamCodeImportConflict("rename")} type="button">
+                  Rename
+                </button>
+                <button onClick={() => onResolveTeamCodeImportConflict("replace")} type="button">
+                  Replace
+                </button>
+                <button onClick={() => onResolveTeamCodeImportConflict("replaceAll")} type="button">
+                  Replace All
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {pendingCloseCodeFileTab && (
           <div className="teamcode-dialog-backdrop" onMouseDown={onCancelCloseCodeFileTab}>
             <div className="teamcode-dialog" onMouseDown={(event) => event.stopPropagation()}>
@@ -620,6 +760,22 @@ export function OnBotJavaPage({
           <span>{dragItemLabel(draggedTeamCodeItem)}</span>
         </div>
       )}
+
+      <input
+        accept=".zip,application/zip,application/x-zip-compressed"
+        ref={uploadZipInputRef}
+        style={{ display: "none" }}
+        type="file"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          event.currentTarget.value = "";
+          setIsUploadMenuOpen(false);
+          setIsGithubUploadFormOpen(false);
+          if (file) {
+            onImportTeamCodeZipFile(file);
+          }
+        }}
+      />
     </section>
   );
 }

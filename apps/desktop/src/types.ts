@@ -100,3 +100,18 @@ export type TeamCodeDialog =
       path: string;
       value: string;
     };
+
+export type TeamCodeImportConflictPrompt = {
+  path: string;
+  index: number;
+  total: number;
+  renamePath: string;
+};
+
+export type TeamCodeImportConflictAction = "replace" | "skip" | "rename" | "replaceAll";
+
+export type TeamCodeZipImportPreview = {
+  archiveKind: "ftc_repo" | "teamcode_folder";
+  files: string[];
+  conflicts: string[];
+};

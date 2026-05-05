@@ -630,6 +630,32 @@ h2 {
   margin: 0;
 }
 
+.teamcode-upload-options {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.teamcode-upload-options button {
+  width: 100%;
+  margin: 0;
+  padding: 9px 12px;
+  border: 1px solid #4a5568;
+  border-radius: 6px;
+  background: #263241;
+  color: #f0f3f6;
+  text-align: left;
+}
+
+.teamcode-upload-options button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.teamcode-import-conflict-actions {
+  flex-wrap: wrap;
+}
+
 .editor-pane {
   display: flex;
   flex-direction: column;
@@ -768,13 +794,31 @@ h2 {
   font-weight: bold;
 }
 
-.runner-output-title span:last-child {
+.runner-output-status {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
   overflow: hidden;
   color: #9ea7b3;
   font-size: 12px;
   font-weight: normal;
-  text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.runner-output-status button {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 4px 8px;
+  border: 1px solid #4d6b8f;
+  border-radius: 6px;
+  background: #1d2d44;
+  color: #dbeafe;
+  font: inherit;
+}
+
+.runner-output-status button:hover {
+  background: #284461;
 }
 
 .runner-output pre {

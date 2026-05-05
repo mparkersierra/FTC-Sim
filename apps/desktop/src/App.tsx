@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import {
   MAX_TERMINAL_HEIGHT,
   MIN_TERMINAL_HEIGHT,
@@ -38,13 +39,17 @@ import type {
   TeamCodeDialog,
   TeamCodeFileTemplate,
   TeamCodeFolder,
+  TeamCodeImportConflictAction,
+  TeamCodeImportConflictPrompt,
   TeamCodeOpModeBase,
   TeamCodeSelection,
+  TeamCodeZipImportPreview,
   TelemetryItem,
 } from "./types";
 import "./App.css";
 
 const gamepadNumbers: GamepadNumber[] = [1, 2];
+const teamCodeExportSuccessStatus = "Export successful. TeamCode.zip is in your Downloads folder.";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -110,12 +115,20 @@ function App() {
   const [codeFileName, setCodeFileName] = useState("");
   const [codeText, setCodeText] = useState("");
   const [codeStatus, setCodeStatus] = useState("");
+  const [teamCodeExportPath, setTeamCodeExportPath] = useState("");
   const [runnerLog, setRunnerLog] = useState("");
   const [isLoadingCodeFile, setIsLoadingCodeFile] = useState(false);
   const [terminalHeight, setTerminalHeight] = useState(180);
   const [expandedTeamCodeFolders, setExpandedTeamCodeFolders] = useState<Record<TeamCodeFolder, boolean>>({});
   const [teamCodeContextMenu, setTeamCodeContextMenu] = useState<TeamCodeContextMenu | null>(null);
   const [teamCodeDialog, setTeamCodeDialog] = useState<TeamCodeDialog | null>(null);
+  const [teamCodeImportArchiveBytes, setTeamCodeImportArchiveBytes] = useState<number[] | null>(null);
+  const [teamCodeImportConflicts, setTeamCodeImportConflicts] = useState<string[]>([]);
+  const [teamCodeImportConflictIndex, setTeamCodeImportConflictIndex] = useState(0);
+  const [teamCodeImportConflictRenamePath, setTeamCodeImportConflictRenamePath] = useState("");
+  const [teamCodeImportDecisions, setTeamCodeImportDecisions] = useState<
+    Record<string, { action: "replace" | "skip" | "rename"; renamePath?: string }>
+  >({});
   const [pendingCloseCodeFileTab, setPendingCloseCodeFileTab] = useState<string | null>(null);
   const [teamCodeSelection, setTeamCodeSelection] = useState<TeamCodeSelection>({ kind: "root", path: "" });
 
@@ -444,6 +457,166 @@ function App() {
       setCodeStatus(String(error));
       loadRunnerLog();
     }
+  };
+
+  const exportTeamCode = async () => {
+    try {
+      setCodeStatus("Exporting TeamCode...");
+
+      await Promise.all(
+        Object.entries(codeTextByFile).map(([relativePath, contents]) =>
+          invoke<string>("save_teamcode_file", {
+            relativePath,
+            contents,
+          }),
+        ),
+      );
+
+      setSavedCodeTextByFile((current) => ({ ...current, ...codeTextByFile }));
+      const exportPath = await invoke<string>("export_teamcode_zip");
+      setTeamCodeExportPath(exportPath);
+      setCodeStatus(teamCodeExportSuccessStatus);
+    } catch (error) {
+      setCodeStatus(String(error));
+    }
+  };
+
+  const openTeamCodeExport = async () => {
+    if (!teamCodeExportPath) return;
+
+    try {
+      await revealItemInDir(teamCodeExportPath);
+    } catch (error) {
+      setCodeStatus(`Failed to open Downloads folder: ${String(error)}`);
+    }
+  };
+
+  const suggestedTeamCodeImportRenamePath = (path: string) => {
+    const separatorIndex = path.lastIndexOf("/");
+    const folder = separatorIndex === -1 ? "" : path.slice(0, separatorIndex + 1);
+    const fileName = separatorIndex === -1 ? path : path.slice(separatorIndex + 1);
+    return `${folder}${fileName.replace(/\.java$/i, "Imported.java")}`;
+  };
+
+  const finishTeamCodeZipImport = async (
+    archiveBytes: number[],
+    decisions: Record<string, { action: "replace" | "skip" | "rename"; renamePath?: string }>,
+    replaceAll: boolean,
+  ) => {
+    try {
+      setCodeStatus("Importing TeamCode...");
+      const result = await invoke<string>("import_teamcode_zip", {
+        archiveBytes,
+        decisions,
+        replaceAll,
+      });
+      setTeamCodeImportArchiveBytes(null);
+      setTeamCodeImportConflicts([]);
+      setTeamCodeImportConflictIndex(0);
+      setTeamCodeImportConflictRenamePath("");
+      setTeamCodeImportDecisions({});
+      setOpenCodeFileTabs([]);
+      setCodeTextByFile({});
+      setTeamCodeSourceTextByFile({});
+      setSavedCodeTextByFile({});
+      setCodeFileName("");
+      setCodeText("");
+      setTeamCodeSelection({ kind: "root", path: "" });
+      await loadTeamCodeFiles();
+      setCodeStatus(result);
+    } catch (error) {
+      setCodeStatus(String(error));
+    }
+  };
+
+  const previewTeamCodeImportArchive = async (archiveBytes: number[]) => {
+    try {
+      const preview = await invoke<TeamCodeZipImportPreview>("preview_teamcode_zip_import", {
+        archiveBytes,
+      });
+      const archiveLabel = preview.archiveKind === "ftc_repo" ? "FTC repo" : "TeamCode folder";
+
+      if (preview.conflicts.length === 0) {
+        setCodeStatus(`Importing ${preview.files.length} Java file${preview.files.length === 1 ? "" : "s"} from ${archiveLabel}...`);
+        await finishTeamCodeZipImport(archiveBytes, {}, false);
+        return;
+      }
+
+      setTeamCodeImportArchiveBytes(archiveBytes);
+      setTeamCodeImportConflicts(preview.conflicts);
+      setTeamCodeImportConflictIndex(0);
+      setTeamCodeImportConflictRenamePath(suggestedTeamCodeImportRenamePath(preview.conflicts[0]));
+      setTeamCodeImportDecisions({});
+      setCodeStatus(
+        `${archiveLabel} zip has ${preview.files.length} Java file${preview.files.length === 1 ? "" : "s"} and ${
+          preview.conflicts.length
+        } conflict${preview.conflicts.length === 1 ? "" : "s"}.`,
+      );
+    } catch (error) {
+      setCodeStatus(String(error));
+    }
+  };
+
+  const importTeamCodeZipFile = async (file: File) => {
+    if (!file.name.toLowerCase().endsWith(".zip")) {
+      setCodeStatus("Choose a .zip file");
+      return;
+    }
+
+    try {
+      setCodeStatus(`Reading ${file.name}...`);
+      await previewTeamCodeImportArchive(Array.from(new Uint8Array(await file.arrayBuffer())));
+    } catch (error) {
+      setCodeStatus(String(error));
+    }
+  };
+
+  const importTeamCodeGithubRepoLink = async (repoUrl: string) => {
+    if (!repoUrl.trim()) {
+      setCodeStatus("Enter a GitHub repo link");
+      return;
+    }
+
+    try {
+      setCodeStatus("Downloading GitHub repo...");
+      const archiveBytes = await invoke<number[]>("download_github_teamcode_zip", {
+        repoUrl,
+      });
+      setCodeStatus("Reading GitHub repo TeamCode...");
+      await previewTeamCodeImportArchive(archiveBytes);
+    } catch (error) {
+      setCodeStatus(String(error));
+    }
+  };
+
+  const resolveTeamCodeImportConflict = async (
+    action: TeamCodeImportConflictAction,
+    renamePath = teamCodeImportConflictRenamePath,
+  ) => {
+    if (!teamCodeImportArchiveBytes) return;
+
+    if (action === "replaceAll") {
+      await finishTeamCodeZipImport(teamCodeImportArchiveBytes, teamCodeImportDecisions, true);
+      return;
+    }
+
+    const conflictPath = teamCodeImportConflicts[teamCodeImportConflictIndex];
+    if (!conflictPath) return;
+
+    const nextDecisions = {
+      ...teamCodeImportDecisions,
+      [conflictPath]: action === "rename" ? { action, renamePath } : { action },
+    };
+    const nextIndex = teamCodeImportConflictIndex + 1;
+
+    if (nextIndex >= teamCodeImportConflicts.length) {
+      await finishTeamCodeZipImport(teamCodeImportArchiveBytes, nextDecisions, false);
+      return;
+    }
+
+    setTeamCodeImportDecisions(nextDecisions);
+    setTeamCodeImportConflictIndex(nextIndex);
+    setTeamCodeImportConflictRenamePath(suggestedTeamCodeImportRenamePath(teamCodeImportConflicts[nextIndex]));
   };
 
   const parentFolderForFile = (fileName: string) => {
@@ -1214,6 +1387,15 @@ function App() {
       }[teamCodeDialog.kind]
     : "";
   const teamCodeDialogSubmitLabel = isDeleteTeamCodeDialog ? "Delete" : "OK";
+  const teamCodeImportConflictPrompt: TeamCodeImportConflictPrompt | null =
+    teamCodeImportConflicts[teamCodeImportConflictIndex] && teamCodeImportArchiveBytes
+      ? {
+          path: teamCodeImportConflicts[teamCodeImportConflictIndex],
+          index: teamCodeImportConflictIndex,
+          total: teamCodeImportConflicts.length,
+          renamePath: teamCodeImportConflictRenamePath,
+        }
+      : null;
 
   return (
     <>
@@ -1257,6 +1439,7 @@ function App() {
         codeFileName={codeFileName}
         codeStatus={codeStatus}
         codeText={codeText}
+        exportedTeamCodeZipPath={codeStatus === teamCodeExportSuccessStatus ? teamCodeExportPath : ""}
         openCodeFileTabs={openCodeFileTabs}
         pendingCloseCodeFileTab={pendingCloseCodeFileTab}
         expandedTeamCodeFolders={expandedTeamCodeFolders}
@@ -1270,6 +1453,7 @@ function App() {
         teamCodeDialogTitle={teamCodeDialogTitle}
         teamCodeFilesByFolder={teamCodeFilesByFolder}
         teamCodeFolders={teamCodeFolders}
+        teamCodeImportConflictPrompt={teamCodeImportConflictPrompt}
         teamCodeSelection={teamCodeSelection}
         teamCodeSourceTextByFile={teamCodeSourceTextByFile}
         terminalHeight={terminalHeight}
@@ -1283,6 +1467,18 @@ function App() {
         }}
         onDeleteTeamCodeItem={deleteTeamCodeItem}
         onDismissDialog={() => setTeamCodeDialog(null)}
+        onExportTeamCode={() => {
+          void exportTeamCode();
+        }}
+        onImportTeamCodeZipFile={(file) => {
+          void importTeamCodeZipFile(file);
+        }}
+        onImportTeamCodeGithubRepoLink={(repoUrl) => {
+          void importTeamCodeGithubRepoLink(repoUrl);
+        }}
+        onOpenTeamCodeExport={() => {
+          void openTeamCodeExport();
+        }}
         onLoadRunnerLog={loadRunnerLog}
         onLoadTeamCodeFiles={loadTeamCodeFiles}
         onMoveTeamCodeItem={moveTeamCodeItem}
@@ -1290,6 +1486,9 @@ function App() {
         onOpenCodeFile={openCodeFile}
         onOpenTeamCodeContextMenu={openTeamCodeContextMenu}
         onRenameTeamCodeItem={renameTeamCodeItem}
+        onResolveTeamCodeImportConflict={(action) => {
+          void resolveTeamCodeImportConflict(action);
+        }}
         onSaveCodeFile={saveCodeFile}
         onSaveCodeFileOnly={() => {
           void saveCodeFileOnly();
@@ -1301,6 +1500,7 @@ function App() {
         onUpdateTeamCodeDialogOpModeBase={updateTeamCodeDialogOpModeBase}
         onUpdateTeamCodeDialogTemplate={updateTeamCodeDialogTemplate}
         onUpdateTeamCodeDialogValue={updateTeamCodeDialogValue}
+        onUpdateTeamCodeImportConflictRenamePath={setTeamCodeImportConflictRenamePath}
       />
     </>
   );
