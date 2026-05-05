@@ -630,6 +630,14 @@ h2 {
   margin: 0;
 }
 
+.teamcode-dialog-actions .teamcode-dialog-primary {
+  background: #1f6feb;
+}
+
+.teamcode-dialog-actions .teamcode-dialog-primary:hover {
+  background: #2f81f7;
+}
+
 .teamcode-upload-options {
   display: grid;
   gap: 10px;

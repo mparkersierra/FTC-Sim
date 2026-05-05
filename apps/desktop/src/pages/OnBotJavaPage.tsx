@@ -51,6 +51,7 @@ type OnBotJavaPageProps = {
   onCreateCodeFolder: () => void;
   onCreateCodeFolderFromContextFolder: () => void;
   onCancelCloseCodeFileTab: () => void;
+  onDiscardAndCloseCodeFileTab: () => void;
   onConfirmSaveAndCloseCodeFileTab: () => void;
   onDeleteTeamCodeItem: () => void;
   onDismissDialog: () => void;
@@ -109,6 +110,7 @@ export function OnBotJavaPage({
   onCreateCodeFolder,
   onCreateCodeFolderFromContextFolder,
   onCancelCloseCodeFileTab,
+  onDiscardAndCloseCodeFileTab,
   onConfirmSaveAndCloseCodeFileTab,
   onDeleteTeamCodeItem,
   onDismissDialog,
@@ -463,7 +465,7 @@ export function OnBotJavaPage({
             <button
               disabled={!codeFileName || isLoadingCodeFile}
               onClick={onSaveCodeFileOnly}
-              title="Save Without Compiling"
+              title="Save Current File"
               type="button"
             >
               <span className="save-icon" aria-hidden="true" />
@@ -493,7 +495,7 @@ export function OnBotJavaPage({
             className="ide-compile-button"
             disabled={!codeFileName || isLoadingCodeFile}
             onClick={onSaveCodeFile}
-            title="Save, Compile, and Restart"
+            title="Save All Open Files, Compile, and Restart"
             type="button"
           >
             <img className="compile-icon" src="/assets/editor/wrench.png" alt="" aria-hidden="true" />
@@ -726,7 +728,10 @@ export function OnBotJavaPage({
                 <button onClick={onCancelCloseCodeFileTab} type="button">
                   Cancel
                 </button>
-                <button onClick={onConfirmSaveAndCloseCodeFileTab} type="button">
+                <button onClick={onDiscardAndCloseCodeFileTab} type="button">
+                  Don't Save
+                </button>
+                <button className="teamcode-dialog-primary" onClick={onConfirmSaveAndCloseCodeFileTab} type="button">
                   Save
                 </button>
               </div>

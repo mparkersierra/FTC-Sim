@@ -320,6 +320,19 @@ function App() {
     closeCodeFileTabWithoutPrompt(fileName);
   };
 
+  const discardAndClosePendingCodeFileTab = () => {
+    if (!pendingCloseCodeFileTab) return;
+
+    const fileName = pendingCloseCodeFileTab;
+    const savedContents = savedCodeTextByFile[fileName];
+    setPendingCloseCodeFileTab(null);
+    setTeamCodeSourceTextByFile((current) => {
+      if (savedContents === undefined) return current;
+      return { ...current, [fileName]: savedContents };
+    });
+    void closeCodeFileTabWithoutPrompt(fileName);
+  };
+
   const refreshOpenCodeFileAfterPathChange = async (previousPath: string, nextPath: string) => {
     setOpenCodeFileTabs((current) => current.map((tab) => (tab === previousPath ? nextPath : tab)));
 
@@ -432,17 +445,26 @@ function App() {
       return;
     }
 
-    try {
-      setCodeStatus("Saving and compiling...");
-      await invoke<string>("save_teamcode_file", {
-        relativePath: codeFileName,
-        contents: codeText,
-      });
-      setCodeTextByFile((current) => ({ ...current, [codeFileName]: codeText }));
-      setTeamCodeSourceTextByFile((current) => ({ ...current, [codeFileName]: codeText }));
-      setSavedCodeTextByFile((current) => ({ ...current, [codeFileName]: codeText }));
+    const buffersToSave = {
+      ...codeTextByFile,
+      [codeFileName]: codeText,
+    };
 
-      setCodeStatus("Saved. Restarting sim runner to compile TeamCode...");
+    try {
+      setCodeStatus("Saving all open files and compiling...");
+      await Promise.all(
+        Object.entries(buffersToSave).map(([relativePath, contents]) =>
+          invoke<string>("save_teamcode_file", {
+            relativePath,
+            contents,
+          }),
+        ),
+      );
+      setCodeTextByFile((current) => ({ ...current, ...buffersToSave }));
+      setTeamCodeSourceTextByFile((current) => ({ ...current, ...buffersToSave }));
+      setSavedCodeTextByFile((current) => ({ ...current, ...buffersToSave }));
+
+      setCodeStatus("Saved all open files. Restarting sim runner to compile TeamCode...");
       send({ type: "shutdown" });
       const result = await invoke<string>("restart_sim_runner");
 
@@ -1462,6 +1484,7 @@ function App() {
         onCreateCodeFolder={createCodeFolder}
         onCreateCodeFolderFromContextFolder={createCodeFolderFromContextFolder}
         onCancelCloseCodeFileTab={() => setPendingCloseCodeFileTab(null)}
+        onDiscardAndCloseCodeFileTab={discardAndClosePendingCodeFileTab}
         onConfirmSaveAndCloseCodeFileTab={() => {
           void saveAndClosePendingCodeFileTab();
         }}
