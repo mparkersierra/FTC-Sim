@@ -29,7 +29,7 @@ Work on the desktop app:
 
 ```sh
 cd apps/desktop
-npm run dev
+npm run tauri:dev
 ```
 
 Build the macOS DMG:
