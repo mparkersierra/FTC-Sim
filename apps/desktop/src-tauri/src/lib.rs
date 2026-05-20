@@ -30,7 +30,8 @@ pub fn run() {
             settings::read_gamepad_mapping,
             settings::save_gamepad_mapping,
             runner::read_runner_log,
-            runner::restart_sim_runner
+            runner::restart_sim_runner,
+            runner::runner_ws_url
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

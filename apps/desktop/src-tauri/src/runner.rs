@@ -15,7 +15,7 @@ use crate::{
 
 static SIM_RUNNER: OnceLock<Mutex<Option<Child>>> = OnceLock::new();
 static SIM_RUNNER_WORKER: OnceLock<Mutex<()>> = OnceLock::new();
-const SIM_RUNNER_PORT: u16 = 8080;
+static SIM_RUNNER_PORT: OnceLock<Mutex<Option<u16>>> = OnceLock::new();
 const TEAMCODE_COMPILE_ERROR_PREFIX: &str = "TEAMCODE_COMPILE_ERROR: ";
 const TEAMCODE_COMPILE_STATUS_PREFIX: &str = "TEAMCODE_COMPILE_STATUS: ";
 const PORT_RELEASE_TIMEOUT: Duration = Duration::from_secs(10);
@@ -81,6 +81,24 @@ fn java_executable(root: &Path) -> PathBuf {
 
 fn is_port_available(port: u16) -> bool {
     TcpListener::bind(("0.0.0.0", port)).is_ok()
+}
+
+fn dynamic_runner_port() -> Result<u16, String> {
+    TcpListener::bind(("127.0.0.1", 0))
+        .and_then(|listener| listener.local_addr())
+        .map(|address| address.port())
+        .map_err(|e| e.to_string())
+}
+
+fn runner_port(force_new: bool) -> Result<u16, String> {
+    let port = SIM_RUNNER_PORT.get_or_init(|| Mutex::new(None));
+    let mut port = port.lock().map_err(|e| e.to_string())?;
+
+    if force_new || port.is_none() {
+        *port = Some(dynamic_runner_port()?);
+    }
+
+    port.ok_or_else(|| "Sim runner port has not been assigned".into())
 }
 
 fn wait_for_port_release(port: u16) -> Result<(), String> {
@@ -150,7 +168,7 @@ fn runner_log_stdio() -> Result<(Stdio, Stdio), String> {
     Ok((Stdio::from(log_file), Stdio::from(err_file)))
 }
 
-fn spawn_sim_runner(root: &Path) -> Result<Child, String> {
+fn spawn_sim_runner(root: &Path, port: u16) -> Result<Child, String> {
     ensure_teamcode_workspace()?;
 
     let teamcode_root = teamcode_workspace_root();
@@ -168,6 +186,8 @@ fn spawn_sim_runner(root: &Path) -> Result<Child, String> {
             .arg(runner_jar)
             .arg("--teamcode-root")
             .arg(teamcode_root)
+            .arg("--port")
+            .arg(port.to_string())
             .stdin(Stdio::null())
             .stdout(stdout)
             .stderr(stderr)
@@ -178,8 +198,9 @@ fn spawn_sim_runner(root: &Path) -> Result<Child, String> {
     Command::new("./gradlew")
         .arg(":apps:runner:run")
         .arg(format!(
-            "--args=--teamcode-root {}",
-            teamcode_root.to_string_lossy()
+            "--args=--teamcode-root \"{}\" --port {}",
+            teamcode_root.to_string_lossy(),
+            port
         ))
         .current_dir(root)
         .stdin(Stdio::null())
@@ -196,7 +217,12 @@ pub(crate) fn start_sim_runner_background(force_restart: bool) {
             return;
         };
 
-        if !force_restart && is_runner_accepting_connections(SIM_RUNNER_PORT) {
+        let Ok(port) = runner_port(force_restart) else {
+            eprintln!("Failed to choose sim runner port");
+            return;
+        };
+
+        if !force_restart && is_runner_accepting_connections(port) {
             return;
         }
 
@@ -212,14 +238,14 @@ pub(crate) fn start_sim_runner_background(force_restart: bool) {
 
         let mut attempt = 1;
         loop {
-            if let Err(error) = wait_for_port_release(SIM_RUNNER_PORT) {
+            if let Err(error) = wait_for_port_release(port) {
                 eprintln!("Sim runner restart attempt {attempt} waiting for port failed: {error}");
                 attempt += 1;
                 thread::sleep(Duration::from_secs(1));
                 continue;
             }
 
-            let mut child = match spawn_sim_runner(&root) {
+            let mut child = match spawn_sim_runner(&root, port) {
                 Ok(child) => child,
                 Err(error) => {
                     eprintln!("Sim runner restart attempt {attempt} failed to spawn: {error}");
@@ -229,12 +255,12 @@ pub(crate) fn start_sim_runner_background(force_restart: bool) {
                 }
             };
 
-            match wait_for_runner_ready(&mut child, SIM_RUNNER_PORT) {
+            match wait_for_runner_ready(&mut child, port) {
                 Ok(()) => {
                     if let Ok(mut runner) = runner.lock() {
                         *runner = Some(child);
                     }
-                    println!("Sim runner started on attempt {attempt}");
+                    println!("Sim runner started on port {port} on attempt {attempt}");
                     return;
                 }
                 Err(error) => {
@@ -273,4 +299,9 @@ pub(crate) fn read_runner_log() -> Result<String, String> {
 pub(crate) fn restart_sim_runner() -> Result<String, String> {
     start_sim_runner_background(true);
     Ok("Sim runner restart started".into())
+}
+
+#[tauri::command]
+pub(crate) fn runner_ws_url() -> Result<String, String> {
+    Ok(format!("ws://localhost:{}", runner_port(false)?))
 }

@@ -18,6 +18,7 @@ import java.util.concurrent.TimeUnit;
 public class Main {
     private static final String TEAMCODE_COMPILE_ERROR_PREFIX = "TEAMCODE_COMPILE_ERROR: ";
     private static final long TELEMETRY_BROADCAST_INTERVAL_MILLIS = 50;
+    private static final int DEFAULT_PORT = 8080;
 
     public static void main(String[] args) throws Exception {
         TeamCodeWorkspace teamCodeWorkspace = new TeamCodeWorkspace(teamCodeRoot(args));
@@ -55,7 +56,7 @@ public class Main {
         RobotPose robotPose = new RobotPose();
 
         SimWebSocketServer server =
-            new SimWebSocketServer(8080, opModeManager, robotPose, hardwareRegistry);
+            new SimWebSocketServer(port(args), opModeManager, robotPose, hardwareRegistry);
         telemetry.setSink(server::broadcastTelemetry);
         ScheduledExecutorService telemetryBroadcaster = startTelemetryBroadcaster(telemetry);
             
@@ -96,13 +97,39 @@ public class Main {
     }
 
     private static Path teamCodeRoot(String[] args) {
-        for (int i = 0; i < args.length - 1; i++) {
-            if ("--teamcode-root".equals(args[i])) {
-                return Path.of(args[i + 1]);
-            }
+        String value = optionValue(args, "--teamcode-root");
+        if (!value.isBlank()) {
+            return Path.of(value);
         }
 
         return Path.of("TeamCode");
+    }
+
+    private static int port(String[] args) {
+        String value = optionValue(args, "--port");
+        if (value.isBlank()) {
+            return DEFAULT_PORT;
+        }
+
+        try {
+            int port = Integer.parseInt(value);
+            if (port < 1 || port > 65535) {
+                throw new IllegalArgumentException("Port out of range: " + value);
+            }
+            return port;
+        } catch (NumberFormatException error) {
+            throw new IllegalArgumentException("Invalid --port value: " + value, error);
+        }
+    }
+
+    private static String optionValue(String[] args, String option) {
+        for (int i = 0; i < args.length - 1; i++) {
+            if (option.equals(args[i])) {
+                return args[i + 1];
+            }
+        }
+
+        return "";
     }
 
     private static boolean hasFlag(String[] args, String flag) {

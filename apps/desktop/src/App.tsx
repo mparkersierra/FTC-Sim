@@ -1022,10 +1022,24 @@ function App() {
     const connect = (delayMs = 0) => {
       window.clearTimeout(reconnectTimer);
 
-      reconnectTimer = window.setTimeout(() => {
+      reconnectTimer = window.setTimeout(async () => {
         if (disposed) return;
 
-        const socket = new WebSocket("ws://localhost:8080");
+        let runnerUrl: string;
+        try {
+          runnerUrl = await invoke<string>("runner_ws_url");
+        } catch (error) {
+          if (!disposed) {
+            setStatusText("Disconnected. Reconnecting...");
+            setInfoText(`Runner unavailable: ${String(error)}`);
+            connect(1000);
+          }
+          return;
+        }
+
+        if (disposed) return;
+
+        const socket = new WebSocket(runnerUrl);
         socketRef.current = socket;
 
         socket.onopen = () => {

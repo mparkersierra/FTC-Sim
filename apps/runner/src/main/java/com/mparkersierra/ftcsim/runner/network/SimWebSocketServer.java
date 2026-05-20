@@ -19,6 +19,7 @@ public class SimWebSocketServer extends WebSocketServer {
     private final RobotPose robotPose;
 
     private final SimHardwareRegistry hardwareRegistry;
+    private final int port;
 
     public SimWebSocketServer(
         int port,
@@ -27,6 +28,7 @@ public class SimWebSocketServer extends WebSocketServer {
         SimHardwareRegistry hardwareRegistry
     ) {
         super(new InetSocketAddress(port));
+        this.port = port;
         this.opModeManager = opModeManager;
         this.robotPose = robotPose;
         this.hardwareRegistry = hardwareRegistry;
@@ -233,5 +235,5 @@ public class SimWebSocketServer extends WebSocketServer {
 
     @Override public void onClose(WebSocket conn, int code, String reason, boolean remote) {}
     @Override public void onError(WebSocket conn, Exception ex) { ex.printStackTrace(); }
-    @Override public void onStart() { System.out.println("WebSocket running on ws://localhost:8080"); }
+    @Override public void onStart() { System.out.println("WebSocket running on ws://localhost:" + port); }
 }
