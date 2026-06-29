@@ -1,0 +1,436 @@
+.cad-visualizer-page .cad-visualizer-shell {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr) 300px;
+  height: calc(100vh - 42px);
+  overflow: hidden;
+  background: #12151c;
+}
+
+.cad-visualizer-page .sidebar {
+  min-width: 0;
+  overflow: auto;
+  border-color: #2b313d;
+  background: #181d26;
+}
+
+.cad-visualizer-page .part-tree {
+  border-right: 1px solid #2b313d;
+}
+
+.cad-visualizer-page .right-rail {
+  min-width: 0;
+  overflow: auto;
+  border-left: 1px solid #2b313d;
+  background: #181d26;
+}
+
+.cad-visualizer-page .motion-panel {
+  border-top: 1px solid #2b313d;
+}
+
+.cad-visualizer-page .panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 56px;
+  padding: 14px 16px;
+  border-bottom: 1px solid #2b313d;
+}
+
+.cad-visualizer-page .panel-header h2 {
+  margin: 0;
+  color: #f4f7fb;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.cad-visualizer-page .panel-header span {
+  color: #98a4b5;
+  font-size: 13px;
+}
+
+.cad-visualizer-page .subpanel-header {
+  padding: 14px 16px 0;
+}
+
+.cad-visualizer-page .subpanel-header h3 {
+  margin: 0;
+  color: #f4f7fb;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.cad-visualizer-page .empty-state {
+  margin: 16px;
+  color: #98a4b5;
+  font-size: 14px;
+}
+
+.cad-visualizer-page .part-list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 10px;
+  list-style: none;
+}
+
+.cad-visualizer-page .part-drill-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 10px 10px 0;
+}
+
+.cad-visualizer-page .part-drill-controls button {
+  min-height: 32px;
+  border: 1px solid #303746;
+  border-radius: 6px;
+  color: #d9e2f1;
+  background: #1a202b;
+}
+
+.cad-visualizer-page .part-drill-controls button:hover:not(:disabled) {
+  border-color: #4d8dff;
+  background: #22304a;
+}
+
+.cad-visualizer-page .part-drill-controls button:disabled {
+  cursor: not-allowed;
+  color: #667287;
+  background: #151a23;
+}
+
+.cad-visualizer-page .part-list button {
+  width: 100%;
+  min-height: 36px;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 7px 10px;
+  color: #cfd6e2;
+  background: transparent;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cad-visualizer-page .part-list button:hover {
+  border-color: #3b4658;
+  background: #202734;
+}
+
+.cad-visualizer-page .part-list button.selected {
+  border-color: #4d8dff;
+  color: #f8fbff;
+  background: #243754;
+}
+
+.cad-visualizer-page .viewer-pane {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  background: #10141b;
+}
+
+.cad-visualizer-page .viewer-pane canvas {
+  display: block;
+}
+
+.cad-visualizer-page .viewer-status {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  max-width: calc(100% - 32px);
+  border: 1px solid #303746;
+  border-radius: 6px;
+  padding: 8px 10px;
+  color: #aeb8c8;
+  background: rgba(18, 21, 28, 0.86);
+  font-size: 13px;
+}
+
+.cad-visualizer-page .viewer-toolbar {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 2;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.cad-visualizer-page .viewer-tool {
+  min-height: 38px;
+  border: 1px solid #3b4658;
+  border-radius: 6px;
+  padding: 8px 12px;
+  color: #dbe5f2;
+  background: rgba(32, 39, 52, 0.92);
+  font-weight: 700;
+}
+
+.cad-visualizer-page .viewer-menu {
+  position: relative;
+}
+
+.cad-visualizer-page .viewer-menu::after {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  height: 8px;
+  content: "";
+}
+
+.cad-visualizer-page .viewer-tool:hover,
+.cad-visualizer-page .viewer-tool.active {
+  border-color: #5d9bff;
+  color: #ffffff;
+  background: #2f68c5;
+}
+
+.cad-visualizer-page .orientation-tool {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  display: grid;
+  gap: 8px;
+  width: 178px;
+  border: 1px solid #303746;
+  border-radius: 6px;
+  padding: 10px;
+  color: #aeb8c8;
+  background: rgba(18, 21, 28, 0.86);
+  font-size: 12px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.cad-visualizer-page .viewer-menu:hover .orientation-tool,
+.cad-visualizer-page .viewer-menu:focus-within .orientation-tool {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.cad-visualizer-page .orientation-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.cad-visualizer-page .orientation-grid button,
+.cad-visualizer-page .orientation-reset {
+  min-width: 0;
+  min-height: 30px;
+  border: 1px solid #3b4658;
+  border-radius: 6px;
+  color: #dbe5f2;
+  background: #202734;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.cad-visualizer-page .orientation-grid button:hover,
+.cad-visualizer-page .orientation-reset:hover {
+  border-color: #5d9bff;
+  color: #ffffff;
+  background: #2f68c5;
+}
+
+.cad-visualizer-page .field-group,
+.cad-visualizer-page .import-panel,
+.cad-visualizer-page .motion-panel fieldset {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  border: 0;
+  padding: 16px;
+}
+
+.cad-visualizer-page .motion-panel fieldset:disabled {
+  opacity: 0.55;
+}
+
+.cad-visualizer-page .import-panel label,
+.cad-visualizer-page .motion-panel label {
+  display: grid;
+  gap: 6px;
+  color: #98a4b5;
+  font-size: 13px;
+}
+
+.cad-visualizer-page .import-panel .checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cad-visualizer-page .import-panel .checkbox-row input {
+  width: auto;
+}
+
+.cad-visualizer-page .import-panel input,
+.cad-visualizer-page .import-panel select,
+.cad-visualizer-page .motion-panel input,
+.cad-visualizer-page .motion-panel select,
+.cad-visualizer-page .motion-panel output {
+  min-width: 0;
+  width: 100%;
+  border: 1px solid #353d4c;
+  border-radius: 6px;
+  padding: 8px 10px;
+  color: #edf2f8;
+  background: #10141b;
+}
+
+.cad-visualizer-page .motion-panel output {
+  min-height: 38px;
+}
+
+.cad-visualizer-page .motion-panel input[type="range"] {
+  padding: 0;
+  accent-color: #4d8dff;
+}
+
+.cad-visualizer-page .primary-action {
+  min-height: 38px;
+  border: 1px solid #5d9bff;
+  border-radius: 6px;
+  color: #ffffff;
+  background: #2f68c5;
+  font-weight: 700;
+}
+
+.cad-visualizer-page .secondary-action {
+  min-height: 38px;
+  border: 1px solid #3b4658;
+  border-radius: 6px;
+  color: #dbe5f2;
+  background: #202734;
+  font-weight: 700;
+}
+
+.cad-visualizer-page .primary-action:hover {
+  background: #3977dc;
+}
+
+.cad-visualizer-page .primary-action:disabled,
+.cad-visualizer-page .secondary-action:disabled,
+.cad-visualizer-page .text-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.cad-visualizer-page .generated-models {
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid #2b313d;
+  padding-top: 12px;
+}
+
+.cad-visualizer-page .generated-models-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #98a4b5;
+  font-size: 13px;
+}
+
+.cad-visualizer-page .text-action {
+  border: 0;
+  padding: 0;
+  color: #8fb7ff;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.cad-visualizer-page .generated-model-list {
+  display: grid;
+  gap: 6px;
+}
+
+.cad-visualizer-page .generated-model-item {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid #353d4c;
+  border-radius: 6px;
+  padding: 7px 9px;
+  color: #edf2f8;
+  background: #10141b;
+  text-align: left;
+}
+
+.cad-visualizer-page .generated-model-item:hover {
+  border-color: #4d8dff;
+  background: #172235;
+}
+
+.cad-visualizer-page .generated-model-item span,
+.cad-visualizer-page .generated-model-item small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cad-visualizer-page .generated-model-item small,
+.cad-visualizer-page .empty-generated-models {
+  color: #98a4b5;
+  font-size: 12px;
+}
+
+.cad-visualizer-page .empty-generated-models {
+  margin: 0;
+}
+
+.cad-visualizer-page .model-url,
+.cad-visualizer-page .import-status {
+  overflow-wrap: anywhere;
+  color: #98a4b5;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.cad-visualizer-page .import-status {
+  margin: 0;
+  color: #c8d2df;
+}
+
+.cad-visualizer-page .tree-preview {
+  max-height: 260px;
+  overflow: auto;
+  border: 1px solid #303746;
+  border-radius: 6px;
+  margin: 0;
+  padding: 10px;
+  color: #c8d2df;
+  background: #10141b;
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: pre;
+}
+
+@media (max-width: 900px) {
+  .cad-visualizer-page .cad-visualizer-shell {
+    grid-template-columns: 210px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) 280px;
+  }
+
+  .cad-visualizer-page .right-rail {
+    grid-column: 1 / -1;
+    border-top: 1px solid #2b313d;
+    border-left: 0;
+  }
+}

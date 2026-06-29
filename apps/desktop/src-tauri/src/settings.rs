@@ -41,7 +41,8 @@ pub fn save_gamepad_mapping(app: AppHandle, mapping: serde_json::Value) -> Resul
 
     let contents = serde_json::to_string_pretty(&mapping)
         .map_err(|error| format!("Failed to serialize gamepad mapping: {error}"))?;
-    fs::write(&path, contents).map_err(|error| format!("Failed to save gamepad mapping: {error}"))?;
+    fs::write(&path, contents)
+        .map_err(|error| format!("Failed to save gamepad mapping: {error}"))?;
 
     Ok(())
 }

@@ -7,8 +7,10 @@ FTC Sim is split into a desktop shell, a Java simulator runner, reusable Java li
 
 - `apps/desktop` - React and Tauri desktop app.
 - `apps/runner` - Java simulator runner process.
+- `apps/cad-backend` - Java CAD conversion backend used by the CAD Visualizer tab.
 - `libs/ftc-sdk-shim` - FTC SDK-compatible shim classes.
 - `libs/sim-core` - Shared simulator core code.
+- `native/cad-step-to-glb` - OpenCascade STEP-to-GLB converter used by the CAD backend.
 - `examples/teamcode` - Checked-in sample TeamCode.
 - `workspace/TeamCode` - Local editable TeamCode used by the app. Ignored by git.
 - `runtime` - Local or bundled Java runtime. Ignored by git.
@@ -23,6 +25,19 @@ Run the Java simulator runner:
 
 ```sh
 ./gradlew :apps:runner:build
+```
+
+Build the CAD backend:
+
+```sh
+./gradlew :apps:cad-backend:build
+```
+
+Build the native STEP converter:
+
+```sh
+cmake -S native/cad-step-to-glb -B native/cad-step-to-glb/build
+cmake --build native/cad-step-to-glb/build
 ```
 
 Work on the desktop app:

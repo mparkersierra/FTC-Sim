@@ -9,6 +9,7 @@ const tabs: Array<{ id: TabId; label: string }> = [
   { id: "driverStation", label: "Driver Station" },
   { id: "configuration", label: "Configuration" },
   { id: "onbotJava", label: "OnBot Java" },
+  { id: "cadVisualizer", label: "CAD Visualizer" },
 ];
 
 export function Tabs({ activeTab, onChange }: TabsProps) {

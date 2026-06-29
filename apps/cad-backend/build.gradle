@@ -1,0 +1,27 @@
+plugins {
+    id("application")
+}
+
+group = "dev.cadmotion"
+version = "0.1.0"
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
+application {
+    mainClass = "dev.cadmotion.backend.CadMotionBackend"
+}
+
+run {
+    workingDir = rootProject.projectDir
+}
+
+jar {
+    archiveBaseName = "cad-motion-backend"
+    manifest {
+        attributes("Main-Class": application.mainClass.get())
+    }
+}

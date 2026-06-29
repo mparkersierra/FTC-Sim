@@ -21,6 +21,7 @@ import {
 } from "./config";
 import { Tabs } from "./components/Tabs";
 import { useFieldCanvas } from "./hooks/useFieldCanvas";
+import { CadVisualizerPage } from "./pages/CadVisualizerPage";
 import { ConfigurationPage } from "./pages/ConfigurationPage";
 import { DriverStationPage } from "./pages/DriverStationPage";
 import { OnBotJavaPage } from "./pages/OnBotJavaPage";
@@ -1539,6 +1540,8 @@ function App() {
         onUpdateTeamCodeDialogValue={updateTeamCodeDialogValue}
         onUpdateTeamCodeImportConflictRenamePath={setTeamCodeImportConflictRenamePath}
       />
+
+      <CadVisualizerPage activeTab={activeTab} />
     </>
   );
 }

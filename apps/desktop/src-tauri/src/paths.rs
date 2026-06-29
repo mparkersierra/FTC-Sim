@@ -35,3 +35,7 @@ pub(crate) fn teamcode_root() -> PathBuf {
 pub(crate) fn runner_log_path() -> PathBuf {
     app_root().join("workspace").join("runner.log")
 }
+
+pub(crate) fn cad_backend_log_path() -> PathBuf {
+    app_root().join("workspace").join("cad-backend.log")
+}

@@ -6,8 +6,10 @@ FTC Sim is a multi-language monorepo. Keep checked-in source, local user code, a
 
 - `apps/desktop` - React and Tauri desktop shell.
 - `apps/runner` - Java simulator process launched by the desktop app.
+- `apps/cad-backend` - Java HTTP service for STEP upload, inspection, conversion, and generated CAD model assets.
 - `libs/ftc-sdk-shim` - Minimal FTC SDK-compatible API surface used by TeamCode.
 - `libs/sim-core` - Shared simulator domain code and hardware abstractions.
+- `native/cad-step-to-glb` - OpenCascade native converter invoked by `apps/cad-backend`.
 - `examples/teamcode` - Checked-in sample FTC TeamCode files.
 - `workspace/TeamCode` - Local editable TeamCode workspace created and used by the app. This is ignored by git.
 - `runtime` - Local or bundled Java runtime artifacts. This is ignored by git.
@@ -16,12 +18,14 @@ FTC Sim is a multi-language monorepo. Keep checked-in source, local user code, a
 
 ## Source vs generated state
 
-Code under `apps`, `libs`, `examples`, `scripts`, and `docs` should be reviewed and committed.
+Code under `apps`, `libs`, `native`, `examples`, `scripts`, and `docs` should be reviewed and committed.
 
 Code and compiled output under `workspace`, `runtime`, `build`, `bin`, `dist`, `node_modules`, and `target` are local or generated state and should not be committed.
 
 ## Build entry points
 
 - Java runner: `./gradlew :apps:runner:run`
+- CAD backend: `./gradlew :apps:cad-backend:run`
+- Native CAD converter: `cmake -S native/cad-step-to-glb -B native/cad-step-to-glb/build && cmake --build native/cad-step-to-glb/build`
 - Desktop frontend: run npm commands from `apps/desktop`
 - macOS DMG: `npm run build:mac:dmg` from `apps/desktop`

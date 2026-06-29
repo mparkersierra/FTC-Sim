@@ -1,4 +1,4 @@
-export type TabId = "driverStation" | "configuration" | "onbotJava";
+export type TabId = "driverStation" | "configuration" | "onbotJava" | "cadVisualizer";
 export type SimStatus = "stopped" | "initialized" | "running";
 
 export type RobotState = {

@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod cad_backend;
 mod paths;
 mod runner;
 mod settings;
@@ -10,6 +11,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .setup(|_| {
             runner::start_sim_runner_background(false);
+            cad_backend::start_cad_backend_background(false);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -31,7 +33,10 @@ pub fn run() {
             settings::save_gamepad_mapping,
             runner::read_runner_log,
             runner::restart_sim_runner,
-            runner::runner_ws_url
+            runner::runner_ws_url,
+            cad_backend::cad_backend_base_url,
+            cad_backend::restart_cad_backend,
+            cad_backend::read_cad_backend_log
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
