@@ -20,6 +20,7 @@ import {
   rootTeamCodeFolder,
 } from "./config";
 import { Tabs } from "./components/Tabs";
+import { updateCadMotorDevice, useCadStore } from "./cad/cadStore";
 import { useFieldCanvas } from "./hooks/useFieldCanvas";
 import { CadVisualizerPage } from "./pages/CadVisualizerPage";
 import { ConfigurationPage } from "./pages/ConfigurationPage";
@@ -76,6 +77,7 @@ const normalizeSavedGamepadMapping = (value: unknown): GamepadMappingConfig => {
 };
 
 function App() {
+  const cadMotorDevices = useCadStore((store) => store.cadMotorDevices);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const robotRef = useRef<RobotState>({ x: 0, y: 0, heading: 0 });
@@ -1001,12 +1003,21 @@ function App() {
   };
 
   const saveHardwareMap = useCallback(() => {
-    const cleaned = hardwareMapRef.current
+    const configuredDevices = hardwareMapRef.current
       .map((item) => ({
         type: item.type,
         name: item.name.trim(),
       }))
       .filter((item) => item.name.length > 0);
+    const cadDevices = cadMotorDevices
+      .map((item) => ({
+        type: item.motorType,
+        name: item.motorName.trim(),
+      }))
+      .filter((item) => item.name.length > 0);
+    const cleaned = Array.from(
+      new Map([...configuredDevices, ...cadDevices].map((item) => [item.name, item])).values(),
+    );
 
     send({
       type: "setHardwareMap",
@@ -1014,7 +1025,7 @@ function App() {
     });
 
     setStatusText("Hardware map saved");
-  }, [send]);
+  }, [cadMotorDevices, send]);
 
   useEffect(() => {
     let disposed = false;
@@ -1456,6 +1467,7 @@ function App() {
         activeBinding={activeBinding}
         activeTab={activeTab}
         bindingHint={bindingHint}
+        cadMotorDevices={cadMotorDevices}
         gamepadMappingConfig={gamepadMappingConfig}
         hardwareMapConfig={hardwareMapConfig}
         inputLabel={inputLabel}
@@ -1468,6 +1480,7 @@ function App() {
           setActiveBinding(binding);
           setBindingHint(`Choose input for Gamepad ${binding.gamepadNumber} ${label}`);
         }}
+        onUpdateCadMotorDevice={updateCadMotorDevice}
         onUpdateHardwareRow={updateHardwareRow}
       />
 

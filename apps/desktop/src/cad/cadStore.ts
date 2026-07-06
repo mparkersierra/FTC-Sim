@@ -1,15 +1,19 @@
 import { useSyncExternalStore } from "react";
 import type {
   Axis,
+  CadMotorDevice,
+  CadMotorType,
   ModelOrientation,
   MotionBehavior,
   MotionConfig,
   MotionDraft,
+  MotionType,
   MotorState,
 } from "./types";
 
 const defaultMotionDraft: MotionDraft = {
-  motorName: "armMotor",
+  motorName: "motor",
+  motorType: "DcMotor",
   type: "rotate",
   axis: "z",
   speed: 1,
@@ -21,6 +25,7 @@ const defaultExpandPattern = "chassis";
 const identityOrientation: ModelOrientation = [0, 0, 0, 1];
 const orientationStoragePrefix = "cad-motion:model-orientation:";
 const drillStoragePrefix = "cad-motion:drill-state:";
+const motionConfigStoragePrefix = "cad-motion:motion-config:";
 
 interface CadState {
   modelUrl: string;
@@ -30,6 +35,7 @@ interface CadState {
   isPickMode: boolean;
   availableParts: string[];
   motionConfig: MotionConfig;
+  cadMotorDevices: CadMotorDevice[];
   motorState: MotorState;
   motionDraft: MotionDraft;
   modelOrientation: ModelOrientation;
@@ -48,6 +54,10 @@ interface CadStore extends CadState {
   setModelOrientation: (orientation: ModelOrientation) => void;
   selectMotionDirection: (axis: Axis, sign: 1 | -1) => void;
   upsertBehavior: (behavior: MotionBehavior) => void;
+  updateCadMotorDevice: (
+    partName: string,
+    updates: Partial<Pick<CadMotorDevice, "motorName" | "motorType">>,
+  ) => void;
   setMotorPower: (motorName: string, power: number) => void;
   resetTransforms: () => void;
 }
@@ -59,6 +69,7 @@ type DrillState = {
 };
 
 const initialDrillState = loadModelDrillState(defaultModelUrl);
+const initialMotionConfig = loadModelMotionConfig(defaultModelUrl);
 const initialState: CadState = {
   modelUrl: defaultModelUrl,
   expandPattern: initialDrillState.expandPattern,
@@ -66,7 +77,8 @@ const initialState: CadState = {
   selectedPartName: null,
   isPickMode: false,
   availableParts: [],
-  motionConfig: { behaviors: [] },
+  motionConfig: initialMotionConfig,
+  cadMotorDevices: cadMotorDevicesForConfig(initialMotionConfig),
   motorState: {},
   motionDraft: defaultMotionDraft,
   modelOrientation: loadModelOrientation(defaultModelUrl),
@@ -114,6 +126,10 @@ function parsePatternList(pattern: string) {
 
 function selectablePatternName(partName: string) {
   return partName.replace(/\s+\(\d+\)$/, "").trim();
+}
+
+export function canonicalCadPartName(partName: string) {
+  return selectablePatternName(partName);
 }
 
 function appendPattern(pattern: string, item: string) {
@@ -192,6 +208,182 @@ function isDrillState(value: unknown): value is DrillState {
     Array.isArray(candidate.drillStack) &&
     candidate.drillStack.every((item) => typeof item === "string")
   );
+}
+
+function isCadMotorType(value: unknown): value is CadMotorType {
+  return value === "DcMotor";
+}
+
+function isMotionType(value: unknown): value is MotionType {
+  return value === "rotate" || value === "translate";
+}
+
+function isAxis(value: unknown): value is Axis {
+  return value === "x" || value === "y" || value === "z";
+}
+
+function normalizeMotionConfig(value: unknown): MotionConfig {
+  if (!value || typeof value !== "object") {
+    return { behaviors: [] };
+  }
+
+  const candidate = value as Partial<MotionConfig>;
+  if (!Array.isArray(candidate.behaviors)) {
+    return { behaviors: [] };
+  }
+
+  return {
+    behaviors: candidate.behaviors.flatMap((item) => {
+      if (!item || typeof item !== "object") {
+        return [];
+      }
+
+      const behavior = item as Partial<MotionBehavior>;
+      if (
+        typeof behavior.partName !== "string" ||
+        typeof behavior.motorName !== "string" ||
+        !isMotionType(behavior.type) ||
+        !isAxis(behavior.axis) ||
+        typeof behavior.speed !== "number" ||
+        !Number.isFinite(behavior.speed)
+      ) {
+        return [];
+      }
+
+      const partName = behavior.partName;
+      const motorName = behavior.motorName.trim();
+      if (!partName || !motorName) {
+        return [];
+      }
+
+      return [
+        {
+          id: `${partName}:${motorName}`,
+          partName,
+          motorName,
+          motorType: isCadMotorType(behavior.motorType)
+            ? behavior.motorType
+            : "DcMotor",
+          type: behavior.type,
+          axis: behavior.axis,
+          speed: behavior.speed,
+          min: typeof behavior.min === "number" ? behavior.min : undefined,
+          max: typeof behavior.max === "number" ? behavior.max : undefined,
+        },
+      ];
+    }),
+  };
+}
+
+function loadModelMotionConfig(modelUrl: string): MotionConfig {
+  const storage = getStorage();
+
+  if (!storage) {
+    return { behaviors: [] };
+  }
+
+  try {
+    const storedValue = storage.getItem(
+      `${motionConfigStoragePrefix}${normalizeModelUrl(modelUrl)}`,
+    );
+
+    if (!storedValue) {
+      return { behaviors: [] };
+    }
+
+    return normalizeMotionConfig(JSON.parse(storedValue) as unknown);
+  } catch {
+    return { behaviors: [] };
+  }
+}
+
+function saveModelMotionConfig(modelUrl: string, motionConfig: MotionConfig) {
+  const storage = getStorage();
+
+  if (!storage) {
+    return;
+  }
+
+  try {
+    storage.setItem(
+      `${motionConfigStoragePrefix}${normalizeModelUrl(modelUrl)}`,
+      JSON.stringify(motionConfig),
+    );
+  } catch {
+    // Persistence is best-effort; viewer state still updates in memory.
+  }
+}
+
+function cadMotorDevicesForConfig(motionConfig: MotionConfig): CadMotorDevice[] {
+  const devicesByMotor = new Map<string, CadMotorDevice>();
+
+  for (const behavior of motionConfig.behaviors) {
+    const motorName = behavior.motorName;
+    const existing = devicesByMotor.get(motorName);
+
+    if (existing) {
+      if (!existing.partNames.includes(behavior.partName)) {
+        existing.partNames.push(behavior.partName);
+      }
+    } else {
+      devicesByMotor.set(motorName, {
+        motorName,
+        motorType: behavior.motorType,
+        partNames: [behavior.partName],
+      });
+    }
+  }
+
+  return Array.from(devicesByMotor.values())
+    .map((device) => ({
+      ...device,
+      partNames: [...device.partNames].sort((a, b) => a.localeCompare(b)),
+    }))
+    .sort((a, b) => a.motorName.localeCompare(b.motorName));
+}
+
+function commitMotionConfig(current: CadState, motionConfig: MotionConfig): CadState {
+  saveModelMotionConfig(current.modelUrl, motionConfig);
+
+  return {
+    ...current,
+    motionConfig,
+    cadMotorDevices: cadMotorDevicesForConfig(motionConfig),
+  };
+}
+
+function suggestedMotorName(motionConfig: MotionConfig) {
+  const names = new Set(motionConfig.behaviors.map((behavior) => behavior.motorName));
+
+  if (!names.has("motor")) {
+    return "motor";
+  }
+
+  for (let index = 1; index < 1000; index += 1) {
+    const name = `motor${index}`;
+    if (!names.has(name)) {
+      return name;
+    }
+  }
+
+  return `motor${Date.now()}`;
+}
+
+function behaviorsForCanonicalPart(
+  current: CadState,
+  behavior: MotionBehavior,
+): MotionBehavior[] {
+  const canonicalPartName = canonicalCadPartName(behavior.partName);
+  const matchingParts = current.availableParts.filter(
+    (partName) => canonicalCadPartName(partName) === canonicalPartName,
+  );
+  const partNames = matchingParts.length > 0 ? matchingParts : [behavior.partName];
+
+  return partNames.map((partName) => ({
+    ...behavior,
+    id: `${partName}:${behavior.motorName}`,
+    partName,
+  }));
 }
 
 function loadModelOrientation(modelUrl: string): ModelOrientation {
@@ -290,6 +482,7 @@ export const cadStore = {
     setModelOrientation: cadActions.setModelOrientation,
     selectMotionDirection: cadActions.selectMotionDirection,
     upsertBehavior: cadActions.upsertBehavior,
+    updateCadMotorDevice: cadActions.updateCadMotorDevice,
     setMotorPower: cadActions.setMotorPower,
     resetTransforms: cadActions.resetTransforms,
   }),
@@ -335,6 +528,7 @@ const cadActions = {
 
     const modelUrl = url.trim();
     const drillState = loadModelDrillState(modelUrl);
+    const motionConfig = loadModelMotionConfig(modelUrl);
 
     setState((current) => ({
       ...current,
@@ -344,9 +538,13 @@ const cadActions = {
       selectedPartName: null,
       isPickMode: false,
       availableParts: [],
-      motionConfig: { behaviors: [] },
+      motionConfig,
+      cadMotorDevices: cadMotorDevicesForConfig(motionConfig),
       motorState: {},
-      motionDraft: defaultMotionDraft,
+      motionDraft: {
+        ...defaultMotionDraft,
+        motorName: suggestedMotorName(motionConfig),
+      },
       modelOrientation: loadModelOrientation(modelUrl),
       resetTransformsToken: current.resetTransformsToken + 1,
     }));
@@ -470,39 +668,98 @@ const cadActions = {
         id: `${current.selectedPartName}:${trimmedMotorName}`,
         partName: current.selectedPartName,
         motorName: trimmedMotorName,
+        motorType: nextDraft.motorType,
         type: nextDraft.type,
         axis,
         speed: nextDraft.speed,
       };
       const behaviors = current.motionConfig.behaviors.filter(
-        (item) => item.id !== behavior.id,
+        (item) =>
+          canonicalCadPartName(item.partName) !==
+          canonicalCadPartName(behavior.partName),
       );
+      const nextBehaviors = behaviorsForCanonicalPart(current, behavior);
 
-      return {
-        ...nextState,
-        motionConfig: {
-          behaviors: [...behaviors, behavior],
+      return commitMotionConfig(
+        {
+          ...nextState,
+          motorState: {
+            ...current.motorState,
+            [trimmedMotorName]: clampMotorPower(nextPower),
+          },
         },
-        motorState: {
-          ...current.motorState,
-          [trimmedMotorName]: clampMotorPower(nextPower),
-        },
-      };
+        { behaviors: [...behaviors, ...nextBehaviors] },
+      );
     });
   },
 
   upsertBehavior: (behavior: MotionBehavior) => {
     setState((current) => {
       const behaviors = current.motionConfig.behaviors.filter(
-        (item) => item.id !== behavior.id,
+        (item) =>
+          canonicalCadPartName(item.partName) !==
+          canonicalCadPartName(behavior.partName),
       );
+      const nextBehaviors = behaviorsForCanonicalPart(current, behavior);
 
       return {
-        ...current,
-        motionConfig: {
-          behaviors: [...behaviors, behavior],
-        },
+        ...commitMotionConfig(current, {
+          behaviors: [...behaviors, ...nextBehaviors],
+        }),
         isPickMode: false,
+      };
+    });
+  },
+
+  updateCadMotorDevice: (
+    motorName: string,
+    updates: Partial<Pick<CadMotorDevice, "motorName" | "motorType">>,
+  ) => {
+    setState((current) => {
+      const existingDevice = current.cadMotorDevices.find(
+        (device) => device.motorName === motorName,
+      );
+      const nextMotorName =
+        updates.motorName === undefined
+          ? existingDevice?.motorName
+          : updates.motorName.trim();
+      const nextMotorType = updates.motorType ?? existingDevice?.motorType ?? "DcMotor";
+
+      if (nextMotorName === undefined) {
+        return current;
+      }
+
+      const motionConfig = {
+        behaviors: current.motionConfig.behaviors.map((behavior) => {
+          if (behavior.motorName !== motorName) {
+            return behavior;
+          }
+
+          return {
+            ...behavior,
+            id: `${behavior.partName}:${nextMotorName}`,
+            motorName: nextMotorName,
+            motorType: nextMotorType,
+          };
+        }),
+      };
+      const motorState =
+        existingDevice?.motorName && existingDevice.motorName !== nextMotorName
+          ? ({
+              ...current.motorState,
+              [nextMotorName]:
+                current.motorState[existingDevice.motorName] ??
+                current.motorState[nextMotorName] ??
+                0,
+              [existingDevice.motorName]: undefined,
+            } as MotorState)
+          : current.motorState;
+
+      return {
+        ...commitMotionConfig(current, motionConfig),
+        motorState: Object.fromEntries(
+          Object.entries(motorState).filter(([, power]) => power !== undefined),
+        ) as MotorState,
       };
     });
   },
@@ -552,6 +809,7 @@ export const {
   setModelOrientation,
   selectMotionDirection,
   upsertBehavior,
+  updateCadMotorDevice,
   setMotorPower,
   resetTransforms,
 } = cadActions;

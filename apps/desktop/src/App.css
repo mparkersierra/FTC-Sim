@@ -203,7 +203,28 @@ h2 {
 }
 
 .hardware-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 220px) minmax(180px, 280px) auto;
+  align-items: center;
+  gap: 8px;
   margin: 12px 0;
+}
+
+.cad-motor-row {
+  grid-template-columns: minmax(160px, 1fr) minmax(140px, 220px) minmax(180px, 280px);
+  max-width: 820px;
+}
+
+.cad-motor-part {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #333;
+  border-radius: 6px;
+  padding: 8px 10px;
+  color: #ccc;
+  background: #181818;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .config-actions {

@@ -477,6 +477,35 @@ function SelectionHelper({
   return helper ? <primitive object={helper} /> : null;
 }
 
+function BehaviorHelper({ object }: { object: Object3D }) {
+  const helper = useMemo(
+    () => new BoxHelper(object, new Color("#f7b733")),
+    [object],
+  );
+
+  useFrame(() => {
+    helper.update();
+  });
+
+  useEffect(() => {
+    return () => {
+      helper.dispose();
+    };
+  }, [helper]);
+
+  return <primitive object={helper} />;
+}
+
+function BehaviorHelpers({ objects }: { objects: Object3D[] }) {
+  return (
+    <>
+      {objects.map((object) => (
+        <BehaviorHelper key={object.uuid} object={object} />
+      ))}
+    </>
+  );
+}
+
 function getGizmoScale(selectedObject: Object3D, box: Box3, center: Vector3) {
   const size = new Vector3();
 
@@ -631,6 +660,8 @@ function CadScene({
   const objectMapRef = useRef<ObjectMap>(new Map());
   const initialTransformsRef = useRef<Map<string, InitialTransform>>(new Map());
   const selectedPartName = useCadStore((store) => store.selectedPartName);
+  const availableParts = useCadStore((store) => store.availableParts);
+  const motionConfig = useCadStore((store) => store.motionConfig);
   const isPickMode = useCadStore((store) => store.isPickMode);
   const expandPattern = useCadStore((store) => store.expandPattern);
   const motionDraft = useCadStore((store) => store.motionDraft);
@@ -641,6 +672,23 @@ function CadScene({
   const selectedObject = selectedPartName
     ? objectMapRef.current.get(selectedPartName) ?? null
     : null;
+  const behaviorObjects = useMemo(() => {
+    const objects: Object3D[] = [];
+    const seen = new Set<string>();
+
+    for (const behavior of motionConfig.behaviors) {
+      const object = objectMapRef.current.get(behavior.partName);
+
+      if (!object || object === selectedObject || seen.has(object.uuid)) {
+        continue;
+      }
+
+      seen.add(object.uuid);
+      objects.push(object);
+    }
+
+    return objects;
+  }, [availableParts, motionConfig, selectedObject]);
 
   useEffect(() => {
     scene.quaternion.set(
@@ -749,6 +797,7 @@ function CadScene({
       <directionalLight intensity={0.6} position={[-5, 3, -3]} />
       <gridHelper args={[12, 24, "#334155", "#202936"]} position={[0, -0.01, 0]} />
       <primitive object={scene} onClick={isPickMode ? handleClick : undefined} />
+      <BehaviorHelpers objects={behaviorObjects} />
       <SelectionHelper selectedObject={selectedObject} />
       <MotionGizmo
         axis={motionDraft.axis}

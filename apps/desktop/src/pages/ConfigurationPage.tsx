@@ -1,4 +1,5 @@
 import { bindableInputs, gamepadControls, hardwareTypes } from "../config";
+import type { CadMotorDevice } from "../cad/types";
 import type { ActiveBinding, Binding, GamepadMappingConfig, GamepadNumber, HardwareDevice, TabId } from "../types";
 
 type ConfigurationPageProps = {
@@ -6,6 +7,7 @@ type ConfigurationPageProps = {
   activeTab: TabId;
   bindingHint: string;
   gamepadMappingConfig: GamepadMappingConfig;
+  cadMotorDevices: CadMotorDevice[];
   hardwareMapConfig: HardwareDevice[];
   inputLabel: (code?: string) => string;
   onAddHardwareRow: () => void;
@@ -13,6 +15,7 @@ type ConfigurationPageProps = {
   onRemoveHardwareRow: (index: number) => void;
   onSaveHardwareMap: () => void;
   onSelectBinding: (binding: Binding, label: string) => void;
+  onUpdateCadMotorDevice: (motorName: string, updates: Partial<Pick<CadMotorDevice, "motorName" | "motorType">>) => void;
   onUpdateHardwareRow: (index: number, updates: Partial<HardwareDevice>) => void;
 };
 
@@ -20,6 +23,7 @@ export function ConfigurationPage({
   activeBinding,
   activeTab,
   bindingHint,
+  cadMotorDevices,
   gamepadMappingConfig,
   hardwareMapConfig,
   inputLabel,
@@ -28,6 +32,7 @@ export function ConfigurationPage({
   onRemoveHardwareRow,
   onSaveHardwareMap,
   onSelectBinding,
+  onUpdateCadMotorDevice,
   onUpdateHardwareRow,
 }: ConfigurationPageProps) {
   return (
@@ -68,6 +73,43 @@ export function ConfigurationPage({
           </div>
         ))}
       </div>
+
+      <h2>CAD Motion Motors</h2>
+
+      {cadMotorDevices.length === 0 ? (
+        <p className="binding-hint">No CAD motion motors saved yet.</p>
+      ) : (
+        <div>
+          {cadMotorDevices.map((item) => (
+            <div className="hardware-row cad-motor-row" key={item.motorName}>
+              <output className="cad-motor-part" title={item.partNames.join(", ")}>
+                {item.partNames.join(", ")}
+              </output>
+
+              <select
+                value={item.motorType}
+                onChange={(event) =>
+                  onUpdateCadMotorDevice(item.motorName, {
+                    motorType: event.target.value as CadMotorDevice["motorType"],
+                  })
+                }
+              >
+                {hardwareTypes.map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </select>
+
+              <input
+                onChange={(event) => onUpdateCadMotorDevice(item.motorName, { motorName: event.target.value })}
+                placeholder="motor name"
+                value={item.motorName}
+              />
+            </div>
+          ))}
+        </div>
+      )}
 
       <h2>Gamepad Mapping</h2>
       <p className="binding-hint">{bindingHint}</p>

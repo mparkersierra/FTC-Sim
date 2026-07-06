@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from "react";
 import {
+  canonicalCadPartName,
   resetTransforms,
   setMotorPower,
   setMotionDraft,
@@ -8,17 +9,40 @@ import {
 } from "./cadStore";
 import type { Axis, MotionType } from "./types";
 
-const defaultMotorName = "armMotor";
+function suggestedMotorName(existingNames: string[]) {
+  const names = new Set(existingNames);
+
+  if (!names.has("motor")) {
+    return "motor";
+  }
+
+  for (let index = 1; index < 1000; index += 1) {
+    const name = `motor${index}`;
+    if (!names.has(name)) {
+      return name;
+    }
+  }
+
+  return `motor${Date.now()}`;
+}
 
 export function MotionPanel() {
   const selectedPartName = useCadStore((store) => store.selectedPartName);
   const behavior = useCadStore((store) =>
     store.motionConfig.behaviors.find(
-      (item) => item.partName === store.selectedPartName,
+      (item) =>
+        store.selectedPartName &&
+        canonicalCadPartName(item.partName) ===
+          canonicalCadPartName(store.selectedPartName),
     ),
   );
+  const motionConfig = useCadStore((store) => store.motionConfig);
   const motorState = useCadStore((store) => store.motorState);
   const motionDraft = useCadStore((store) => store.motionDraft);
+  const behaviorMotorNames = useMemo(
+    () => motionConfig.behaviors.map((item) => item.motorName),
+    [motionConfig],
+  );
 
   useEffect(() => {
     if (!selectedPartName) {
@@ -26,12 +50,13 @@ export function MotionPanel() {
     }
 
     setMotionDraft({
-      motorName: behavior?.motorName ?? defaultMotorName,
+      motorName: behavior?.motorName ?? suggestedMotorName(behaviorMotorNames),
+      motorType: behavior?.motorType ?? "DcMotor",
       type: behavior?.type ?? "rotate",
       axis: behavior?.axis ?? "z",
       speed: behavior?.speed ?? 1,
     });
-  }, [behavior, selectedPartName]);
+  }, [behavior, behaviorMotorNames, selectedPartName]);
 
   const motorPower = useMemo(() => {
     return motorState[motionDraft.motorName] ?? 0;
@@ -48,6 +73,7 @@ export function MotionPanel() {
       id: `${selectedPartName}:${trimmedMotorName}`,
       partName: selectedPartName,
       motorName: trimmedMotorName,
+      motorType: motionDraft.motorType,
       type: motionDraft.type,
       axis: motionDraft.axis,
       speed: motionDraft.speed,
