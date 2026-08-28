@@ -1,9 +1,8 @@
-import type { RefObject } from "react";
+import { CadViewer } from "../cad/CadViewer";
 import type { OpMode, TabId, TelemetryItem } from "../types";
 
 type DriverStationPageProps = {
   activeTab: TabId;
-  canvasRef: RefObject<HTMLCanvasElement | null>;
   infoText: string;
   mainActionButtonText: string;
   opModes: OpMode[];
@@ -17,7 +16,6 @@ type DriverStationPageProps = {
 
 export function DriverStationPage({
   activeTab,
-  canvasRef,
   infoText,
   mainActionButtonText,
   opModes,
@@ -67,9 +65,9 @@ export function DriverStationPage({
           </section>
         </div>
 
-        <section className="field-panel" aria-label="Field">
+        <section className="driver-robot-panel" aria-label="Robot visualizer">
           <div className="info">{infoText}</div>
-          <canvas ref={canvasRef} />
+          <CadViewer mode="display" />
         </section>
       </div>
     </section>

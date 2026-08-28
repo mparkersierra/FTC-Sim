@@ -649,9 +649,13 @@ function MotionGizmo({
 }
 
 function CadScene({
+  allowPartPicking,
+  showMotionGizmo,
   modelOrientation,
   modelUrl,
 }: {
+  allowPartPicking: boolean;
+  showMotionGizmo: boolean;
   modelOrientation: ModelOrientation;
   modelUrl: string;
 }) {
@@ -748,8 +752,11 @@ function CadScene({
         continue;
       }
 
-      const motorPower = motorState[behavior.motorName] ?? 0;
-      if (motorPower === 0 || behavior.speed === 0) {
+      const motorPower =
+        (motorState[behavior.motorName] ?? 0) *
+        (behavior.maxPower ?? 1) *
+        (behavior.positiveDirectionSign ?? 1);
+      if (motorPower === 0) {
         continue;
       }
 
@@ -757,14 +764,14 @@ function CadScene({
         translateAlongLocalAxis(
           object,
           behavior.axis,
-          motorPower * behavior.speed * deltaTime,
+          motorPower * deltaTime,
         );
         continue;
       }
 
       const currentValue = getAxisValue(object, behavior.axis, behavior.type);
       const nextValue = clamp(
-        currentValue + motorPower * behavior.speed * deltaTime,
+        currentValue + motorPower * deltaTime,
         behavior.min,
         behavior.max,
       );
@@ -796,16 +803,18 @@ function CadScene({
       <directionalLight intensity={1.7} position={[4, 8, 5]} />
       <directionalLight intensity={0.6} position={[-5, 3, -3]} />
       <gridHelper args={[12, 24, "#334155", "#202936"]} position={[0, -0.01, 0]} />
-      <primitive object={scene} onClick={isPickMode ? handleClick : undefined} />
+      <primitive object={scene} onClick={allowPartPicking && isPickMode ? handleClick : undefined} />
       <BehaviorHelpers objects={behaviorObjects} />
       <SelectionHelper selectedObject={selectedObject} />
-      <MotionGizmo
-        axis={motionDraft.axis}
-        motorPower={motorPower}
-        selectedObject={selectedObject}
-        type={motionDraft.type}
-      />
-      <OrbitControls enabled={!isPickMode} makeDefault />
+      {showMotionGizmo ? (
+        <MotionGizmo
+          axis={motionDraft.axis}
+          motorPower={motorPower * motionDraft.positiveDirectionSign}
+          selectedObject={selectedObject}
+          type={motionDraft.type}
+        />
+      ) : null}
+      <OrbitControls enabled={!allowPartPicking || !isPickMode} makeDefault />
     </>
   );
 }
@@ -859,16 +868,25 @@ class ModelBoundary extends Component<
   }
 }
 
-export function CadViewer() {
+type CadViewerProps = {
+  mode?: "editor" | "display";
+};
+
+export function CadViewer({ mode = "editor" }: CadViewerProps) {
   const modelUrl = useCadStore((store) => store.modelUrl);
   const modelOrientation = useCadStore((store) => store.modelOrientation);
   const selectedPartName = useCadStore((store) => store.selectedPartName);
   const isPickMode = useCadStore((store) => store.isPickMode);
+  const isEditorMode = mode === "editor";
   const hasActiveMotor = useCadStore((store) =>
     Object.values(store.motorState).some((power) => Math.abs(power) > 0.001),
   );
 
   function handlePointerMissed() {
+    if (!isEditorMode) {
+      return;
+    }
+
     selectPart(null);
 
     if (isPickMode) {
@@ -887,11 +905,17 @@ export function CadViewer() {
         <color args={["#10141b"]} attach="background" />
         <ModelBoundary key={modelUrl}>
           <Suspense fallback={<LoadingScene />}>
-            <CadScene modelOrientation={modelOrientation} modelUrl={modelUrl} />
+            <CadScene
+              allowPartPicking={isEditorMode}
+              modelOrientation={modelOrientation}
+              modelUrl={modelUrl}
+              showMotionGizmo={isEditorMode}
+            />
           </Suspense>
         </ModelBoundary>
       </Canvas>
-      <div className="viewer-toolbar" aria-label="Viewer tools">
+      {isEditorMode ? (
+        <div className="viewer-toolbar" aria-label="Viewer tools">
         <button
           className={isPickMode ? "viewer-tool active" : "viewer-tool"}
           type="button"
@@ -929,7 +953,8 @@ export function CadViewer() {
             </button>
           </div>
         </div>
-      </div>
+        </div>
+      ) : null}
       <div className="viewer-status">
         {selectedPartName ? `Selected: ${selectedPartName}` : "No part selected"}
       </div>

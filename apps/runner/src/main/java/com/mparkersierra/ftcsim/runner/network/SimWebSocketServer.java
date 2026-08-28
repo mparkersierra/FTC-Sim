@@ -199,6 +199,25 @@ public class SimWebSocketServer extends WebSocketServer {
         broadcast(json.toString());
     }
 
+    public void broadcastMotorPowers(Map<String, Double> powers) {
+        StringBuilder json = new StringBuilder();
+        json.append("{\"type\":\"motorPowers\",\"powers\":{");
+
+        boolean first = true;
+        for (Map.Entry<String, Double> entry : powers.entrySet()) {
+            if (!first) json.append(",");
+            first = false;
+
+            json.append("\"")
+                .append(escapeJson(entry.getKey()))
+                .append("\":")
+                .append(entry.getValue());
+        }
+
+        json.append("}}");
+        broadcast(json.toString());
+    }
+
     private void broadcastOpModeStopped() {
         broadcast("{\"type\":\"opModeStopped\"}");
     }

@@ -3,6 +3,9 @@ package com.mparkersierra.ftcsim.runner.simulation;
 import com.mparkersierra.ftcsim.runner.hardware.SimHardwareRegistry;
 import com.qualcomm.robotcore.hardware.DcMotor;
 
+import java.util.Map;
+import java.util.function.Consumer;
+
 public class DrivetrainSimulation {
     private static final double MAX_SPEED_INCHES_PER_SECOND = 15.0;
     private static final double MAX_TURN_SPEED_RADIANS_PER_SECOND = 1.5;
@@ -11,15 +14,18 @@ public class DrivetrainSimulation {
     private final SimHardwareRegistry hardwareRegistry;
     private final RobotPose robotPose;
     private final RobotStateBroadcaster broadcaster;
+    private final Consumer<Map<String, Double>> motorPowerBroadcaster;
 
     public DrivetrainSimulation(
         SimHardwareRegistry hardwareRegistry,
         RobotPose robotPose,
-        RobotStateBroadcaster broadcaster
+        RobotStateBroadcaster broadcaster,
+        Consumer<Map<String, Double>> motorPowerBroadcaster
     ) {
         this.hardwareRegistry = hardwareRegistry;
         this.robotPose = robotPose;
         this.broadcaster = broadcaster;
+        this.motorPowerBroadcaster = motorPowerBroadcaster;
     }
 
     public void run() throws InterruptedException {
@@ -32,6 +38,7 @@ public class DrivetrainSimulation {
 
             update(dt);
             broadcaster.broadcast(robotPose.x, robotPose.y, robotPose.heading);
+            motorPowerBroadcaster.accept(hardwareRegistry.motorPowers());
 
             Thread.sleep(TICK_MS);
         }

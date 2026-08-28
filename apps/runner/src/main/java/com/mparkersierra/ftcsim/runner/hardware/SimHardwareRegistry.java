@@ -41,4 +41,14 @@ public class SimHardwareRegistry {
     public DcMotor getMotor(String name) {
         return motors.get(name);
     }
+
+    public Map<String, Double> motorPowers() {
+        Map<String, Double> powers = new HashMap<>();
+
+        for (Map.Entry<String, DcMotor> entry : motors.entrySet()) {
+            powers.put(entry.getKey(), entry.getValue().getAppliedPower());
+        }
+
+        return powers;
+    }
 }

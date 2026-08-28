@@ -64,7 +64,12 @@ public class Main {
         server.start();
 
         try {
-            new DrivetrainSimulation(hardwareRegistry, robotPose, server::broadcastRobotState).run();
+            new DrivetrainSimulation(
+                hardwareRegistry,
+                robotPose,
+                server::broadcastRobotState,
+                server::broadcastMotorPowers
+            ).run();
         } finally {
             telemetryBroadcaster.shutdownNow();
         }

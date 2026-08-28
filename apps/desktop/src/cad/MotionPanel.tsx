@@ -54,7 +54,9 @@ export function MotionPanel() {
       motorType: behavior?.motorType ?? "DcMotor",
       type: behavior?.type ?? "rotate",
       axis: behavior?.axis ?? "z",
-      speed: behavior?.speed ?? 1,
+      positiveDirectionSign: behavior?.positiveDirectionSign ?? 1,
+      speed: 1,
+      maxPower: behavior?.maxPower ?? 1,
     });
   }, [behavior, behaviorMotorNames, selectedPartName]);
 
@@ -76,7 +78,9 @@ export function MotionPanel() {
       motorType: motionDraft.motorType,
       type: motionDraft.type,
       axis: motionDraft.axis,
-      speed: motionDraft.speed,
+      positiveDirectionSign: motionDraft.positiveDirectionSign,
+      speed: 1,
+      maxPower: motionDraft.maxPower,
     });
   }
 
@@ -131,14 +135,15 @@ export function MotionPanel() {
         </label>
 
         <label>
-          <span>Speed</span>
+          <span>Max speed</span>
           <input
+            max="1"
             min="0"
-            step="0.1"
+            step="0.01"
             type="number"
-            value={motionDraft.speed}
+            value={motionDraft.maxPower}
             onChange={(event) =>
-              setMotionDraft({ speed: event.currentTarget.valueAsNumber || 0 })
+              setMotionDraft({ maxPower: event.currentTarget.valueAsNumber || 0 })
             }
           />
         </label>

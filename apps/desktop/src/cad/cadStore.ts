@@ -16,7 +16,9 @@ const defaultMotionDraft: MotionDraft = {
   motorType: "DcMotor",
   type: "rotate",
   axis: "z",
+  positiveDirectionSign: 1,
   speed: 1,
+  maxPower: 1,
 };
 
 const defaultDirectionPower = 0.5;
@@ -26,6 +28,7 @@ const identityOrientation: ModelOrientation = [0, 0, 0, 1];
 const orientationStoragePrefix = "cad-motion:model-orientation:";
 const drillStoragePrefix = "cad-motion:drill-state:";
 const motionConfigStoragePrefix = "cad-motion:motion-config:";
+const selectedPartStoragePrefix = "cad-motion:selected-part:";
 
 interface CadState {
   modelUrl: string;
@@ -59,6 +62,7 @@ interface CadStore extends CadState {
     updates: Partial<Pick<CadMotorDevice, "motorName" | "motorType">>,
   ) => void;
   setMotorPower: (motorName: string, power: number) => void;
+  setMotorPowers: (powers: MotorState) => void;
   resetTransforms: () => void;
 }
 
@@ -74,7 +78,7 @@ const initialState: CadState = {
   modelUrl: defaultModelUrl,
   expandPattern: initialDrillState.expandPattern,
   drillStack: initialDrillState.drillStack,
-  selectedPartName: null,
+  selectedPartName: loadModelSelectedPartName(defaultModelUrl),
   isPickMode: false,
   availableParts: [],
   motionConfig: initialMotionConfig,
@@ -266,7 +270,14 @@ function normalizeMotionConfig(value: unknown): MotionConfig {
             : "DcMotor",
           type: behavior.type,
           axis: behavior.axis,
+          positiveDirectionSign:
+            behavior.positiveDirectionSign === -1 ? -1 : 1,
           speed: behavior.speed,
+          maxPower:
+            typeof behavior.maxPower === "number" &&
+            Number.isFinite(behavior.maxPower)
+              ? Math.max(0, Math.min(1, behavior.maxPower))
+              : 1,
           min: typeof behavior.min === "number" ? behavior.min : undefined,
           max: typeof behavior.max === "number" ? behavior.max : undefined,
         },
@@ -294,6 +305,44 @@ function loadModelMotionConfig(modelUrl: string): MotionConfig {
     return normalizeMotionConfig(JSON.parse(storedValue) as unknown);
   } catch {
     return { behaviors: [] };
+  }
+}
+
+function loadModelSelectedPartName(modelUrl: string) {
+  const storage = getStorage();
+
+  if (!storage) {
+    return null;
+  }
+
+  try {
+    const storedValue = storage.getItem(
+      `${selectedPartStoragePrefix}${normalizeModelUrl(modelUrl)}`,
+    );
+
+    return storedValue && storedValue.trim() ? storedValue : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveModelSelectedPartName(modelUrl: string, selectedPartName: string | null) {
+  const storage = getStorage();
+
+  if (!storage) {
+    return;
+  }
+
+  try {
+    const storageKey = `${selectedPartStoragePrefix}${normalizeModelUrl(modelUrl)}`;
+
+    if (selectedPartName) {
+      storage.setItem(storageKey, selectedPartName);
+    } else {
+      storage.removeItem(storageKey);
+    }
+  } catch {
+    // Persistence is best-effort; viewer state still updates in memory.
   }
 }
 
@@ -484,6 +533,7 @@ export const cadStore = {
     upsertBehavior: cadActions.upsertBehavior,
     updateCadMotorDevice: cadActions.updateCadMotorDevice,
     setMotorPower: cadActions.setMotorPower,
+    setMotorPowers: cadActions.setMotorPowers,
     resetTransforms: cadActions.resetTransforms,
   }),
   subscribe: (listener: Listener) => {
@@ -494,10 +544,14 @@ export const cadStore = {
 
 const cadActions = {
   selectPart: (name: string | null) => {
-    setState((current) => ({
-      ...current,
-      selectedPartName: name,
-    }));
+    setState((current) => {
+      saveModelSelectedPartName(current.modelUrl, name);
+
+      return {
+        ...current,
+        selectedPartName: name,
+      };
+    });
   },
 
   setPickMode: (enabled: boolean) => {
@@ -510,15 +564,23 @@ const cadActions = {
   setAvailableParts: (parts: string[]) => {
     const availableParts = uniqueSortedParts(parts);
 
-    setState((current) => ({
-      ...current,
-      availableParts,
-      selectedPartName:
+    setState((current) => {
+      const selectedPartName =
         current.selectedPartName &&
         availableParts.includes(current.selectedPartName)
           ? current.selectedPartName
-          : null,
-    }));
+          : null;
+
+      if (current.selectedPartName && !selectedPartName) {
+        saveModelSelectedPartName(current.modelUrl, null);
+      }
+
+      return {
+        ...current,
+        availableParts,
+        selectedPartName,
+      };
+    });
   },
 
   setModelUrl: (url: string) => {
@@ -530,24 +592,28 @@ const cadActions = {
     const drillState = loadModelDrillState(modelUrl);
     const motionConfig = loadModelMotionConfig(modelUrl);
 
-    setState((current) => ({
-      ...current,
-      modelUrl,
-      expandPattern: drillState.expandPattern,
-      drillStack: drillState.drillStack,
-      selectedPartName: null,
-      isPickMode: false,
-      availableParts: [],
-      motionConfig,
-      cadMotorDevices: cadMotorDevicesForConfig(motionConfig),
-      motorState: {},
-      motionDraft: {
-        ...defaultMotionDraft,
-        motorName: suggestedMotorName(motionConfig),
-      },
-      modelOrientation: loadModelOrientation(modelUrl),
-      resetTransformsToken: current.resetTransformsToken + 1,
-    }));
+    setState((current) => {
+      const selectedPartName = loadModelSelectedPartName(modelUrl);
+
+      return {
+        ...current,
+        modelUrl,
+        expandPattern: drillState.expandPattern,
+        drillStack: drillState.drillStack,
+        selectedPartName,
+        isPickMode: false,
+        availableParts: [],
+        motionConfig,
+        cadMotorDevices: cadMotorDevicesForConfig(motionConfig),
+        motorState: {},
+        motionDraft: {
+          ...defaultMotionDraft,
+          motorName: suggestedMotorName(motionConfig),
+        },
+        modelOrientation: loadModelOrientation(modelUrl),
+        resetTransformsToken: current.resetTransformsToken + 1,
+      };
+    });
   },
 
   setExpandPattern: (pattern: string) => {
@@ -558,6 +624,7 @@ const cadActions = {
       };
 
       saveModelDrillState(current.modelUrl, nextDrillState);
+      saveModelSelectedPartName(current.modelUrl, null);
 
       return {
         ...current,
@@ -586,6 +653,7 @@ const cadActions = {
       };
 
       saveModelDrillState(current.modelUrl, nextDrillState);
+      saveModelSelectedPartName(current.modelUrl, null);
 
       return {
         ...current,
@@ -610,6 +678,7 @@ const cadActions = {
       };
 
       saveModelDrillState(current.modelUrl, nextDrillState);
+      saveModelSelectedPartName(current.modelUrl, parentName);
 
       return {
         ...current,
@@ -633,6 +702,7 @@ const cadActions = {
   setModelOrientation: (orientation: ModelOrientation) => {
     setState((current) => {
       saveModelOrientation(current.modelUrl, orientation);
+      saveModelSelectedPartName(current.modelUrl, null);
 
       return {
         ...current,
@@ -653,6 +723,7 @@ const cadActions = {
       const nextDraft = {
         ...current.motionDraft,
         axis,
+        positiveDirectionSign: sign,
       };
       const nextState: CadState = {
         ...current,
@@ -671,7 +742,9 @@ const cadActions = {
         motorType: nextDraft.motorType,
         type: nextDraft.type,
         axis,
+        positiveDirectionSign: sign,
         speed: nextDraft.speed,
+        maxPower: nextDraft.maxPower,
       };
       const behaviors = current.motionConfig.behaviors.filter(
         (item) =>
@@ -779,6 +852,18 @@ const cadActions = {
     }));
   },
 
+  setMotorPowers: (powers: MotorState) => {
+    setState((current) => ({
+      ...current,
+      motorState: Object.fromEntries(
+        Object.entries(powers).map(([motorName, power]) => [
+          motorName,
+          clampMotorPower(power),
+        ]),
+      ),
+    }));
+  },
+
   resetTransforms: () => {
     setState((current) => ({
       ...current,
@@ -811,5 +896,6 @@ export const {
   upsertBehavior,
   updateCadMotorDevice,
   setMotorPower,
+  setMotorPowers,
   resetTransforms,
 } = cadActions;

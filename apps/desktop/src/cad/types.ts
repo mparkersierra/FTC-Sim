@@ -14,7 +14,9 @@ export interface MotionBehavior {
   motorType: CadMotorType;
   type: MotionType;
   axis: Axis;
+  positiveDirectionSign: 1 | -1;
   speed: number;
+  maxPower: number;
   min?: number;
   max?: number;
 }
@@ -34,5 +36,7 @@ export interface MotionDraft {
   motorType: CadMotorType;
   type: MotionType;
   axis: Axis;
+  positiveDirectionSign: 1 | -1;
   speed: number;
+  maxPower: number;
 }

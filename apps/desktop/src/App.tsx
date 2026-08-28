@@ -20,7 +20,7 @@ import {
   rootTeamCodeFolder,
 } from "./config";
 import { Tabs } from "./components/Tabs";
-import { updateCadMotorDevice, useCadStore } from "./cad/cadStore";
+import { resetTransforms, setMotorPowers, updateCadMotorDevice, useCadStore } from "./cad/cadStore";
 import { useFieldCanvas } from "./hooks/useFieldCanvas";
 import { CadVisualizerPage } from "./pages/CadVisualizerPage";
 import { ConfigurationPage } from "./pages/ConfigurationPage";
@@ -1089,6 +1089,22 @@ function App() {
             setSimStatus("stopped");
             setStatusText("Stopped");
             setTelemetryItems([]);
+            setMotorPowers({});
+          }
+
+          if (
+            msg.type === "motorPowers" &&
+            simStatusRef.current !== "stopped" &&
+            isRecord(msg.powers)
+          ) {
+            setMotorPowers(
+              Object.fromEntries(
+                Object.entries(msg.powers).map(([motorName, power]) => [
+                  motorName,
+                  Number(power),
+                ]),
+              ),
+            );
           }
 
           if (msg.type === "telemetry") {
@@ -1232,6 +1248,7 @@ function App() {
   };
 
   const startOpMode = () => {
+    resetTransforms();
     send({ type: "start" });
     setSimStatus("running");
     setStatusText("Started");
@@ -1347,6 +1364,19 @@ function App() {
     }
   }, [activeTab, releasePressedBindings]);
 
+  const changeActiveTab = (nextTab: TabId) => {
+    if (nextTab === activeTab) {
+      return;
+    }
+
+    if (activeTab === "driverStation" && nextTab !== "driverStation" && simStatusRef.current !== "stopped") {
+      releasePressedBindings();
+      stopOpMode();
+    }
+
+    setActiveTab(nextTab);
+  };
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const key = event.key.toLowerCase();
@@ -1447,11 +1477,10 @@ function App() {
 
   return (
     <>
-      <Tabs activeTab={activeTab} onChange={setActiveTab} />
+      <Tabs activeTab={activeTab} onChange={changeActiveTab} />
 
       <DriverStationPage
         activeTab={activeTab}
-        canvasRef={canvasRef}
         infoText={infoText}
         mainActionButtonText={mainActionButtonText}
         opModes={opModes}

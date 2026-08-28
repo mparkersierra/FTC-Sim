@@ -185,6 +185,45 @@ h2 {
   background: #2f6f3e;
 }
 
+.driver-robot-panel {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid #333;
+  border-radius: 8px;
+  background: #10141b;
+}
+
+.driver-robot-panel .viewer-pane {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  background: #10141b;
+}
+
+.driver-robot-panel .viewer-pane canvas {
+  display: block;
+}
+
+.driver-robot-panel .viewer-status {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  max-width: calc(100% - 32px);
+  overflow: hidden;
+  border: 1px solid #303746;
+  border-radius: 6px;
+  padding: 8px 10px;
+  color: #aeb8c8;
+  background: rgba(18, 21, 28, 0.86);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .field-panel canvas {
   display: block;
   width: 100%;
