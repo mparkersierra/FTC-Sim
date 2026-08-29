@@ -22,7 +22,9 @@ const defaultMotionDraft: MotionDraft = {
 };
 
 const defaultDirectionPower = 0.5;
-const defaultModelUrl = "/models/test-robot.glb";
+const fallbackModelUrl = "/models/test-robot.glb";
+const activeModelStorageKey = "cad-motion:active-model-url";
+const defaultModelUrl = loadActiveModelUrl() ?? fallbackModelUrl;
 const defaultExpandPattern = "chassis";
 const identityOrientation: ModelOrientation = [0, 0, 0, 1];
 const orientationStoragePrefix = "cad-motion:model-orientation:";
@@ -57,6 +59,7 @@ interface CadStore extends CadState {
   setModelOrientation: (orientation: ModelOrientation) => void;
   selectMotionDirection: (axis: Axis, sign: 1 | -1) => void;
   upsertBehavior: (behavior: MotionBehavior) => void;
+  deleteBehaviorForPart: (partName: string) => void;
   updateCadMotorDevice: (
     partName: string,
     updates: Partial<Pick<CadMotorDevice, "motorName" | "motorType">>,
@@ -172,6 +175,35 @@ function getStorage() {
   }
 }
 
+function loadActiveModelUrl() {
+  const storage = getStorage();
+
+  if (!storage) {
+    return null;
+  }
+
+  try {
+    const storedValue = storage.getItem(activeModelStorageKey);
+    return storedValue && storedValue.trim() ? storedValue : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveActiveModelUrl(modelUrl: string) {
+  const storage = getStorage();
+
+  if (!storage) {
+    return;
+  }
+
+  try {
+    storage.setItem(activeModelStorageKey, modelUrl);
+  } catch {
+    // Persistence is best-effort; viewer state still updates in memory.
+  }
+}
+
 function normalizeModelUrl(url: string) {
   const trimmedUrl = url.trim();
 
@@ -276,7 +308,7 @@ function normalizeMotionConfig(value: unknown): MotionConfig {
           maxPower:
             typeof behavior.maxPower === "number" &&
             Number.isFinite(behavior.maxPower)
-              ? Math.max(0, Math.min(1, behavior.maxPower))
+              ? Math.max(-1, Math.min(1, behavior.maxPower))
               : 1,
           min: typeof behavior.min === "number" ? behavior.min : undefined,
           max: typeof behavior.max === "number" ? behavior.max : undefined,
@@ -531,6 +563,7 @@ export const cadStore = {
     setModelOrientation: cadActions.setModelOrientation,
     selectMotionDirection: cadActions.selectMotionDirection,
     upsertBehavior: cadActions.upsertBehavior,
+    deleteBehaviorForPart: cadActions.deleteBehaviorForPart,
     updateCadMotorDevice: cadActions.updateCadMotorDevice,
     setMotorPower: cadActions.setMotorPower,
     setMotorPowers: cadActions.setMotorPowers,
@@ -589,6 +622,7 @@ const cadActions = {
     }
 
     const modelUrl = url.trim();
+    saveActiveModelUrl(modelUrl);
     const drillState = loadModelDrillState(modelUrl);
     const motionConfig = loadModelMotionConfig(modelUrl);
 
@@ -784,6 +818,28 @@ const cadActions = {
     });
   },
 
+  deleteBehaviorForPart: (partName: string) => {
+    setState((current) => {
+      const canonicalPartName = canonicalCadPartName(partName);
+      const motionConfig = {
+        behaviors: current.motionConfig.behaviors.filter(
+          (behavior) =>
+            canonicalCadPartName(behavior.partName) !== canonicalPartName,
+        ),
+      };
+
+      return {
+        ...commitMotionConfig(current, motionConfig),
+        motorState: Object.fromEntries(
+          Object.entries(current.motorState).filter(([motorName]) =>
+            motionConfig.behaviors.some((behavior) => behavior.motorName === motorName),
+          ),
+        ) as MotorState,
+        isPickMode: false,
+      };
+    });
+  },
+
   updateCadMotorDevice: (
     motorName: string,
     updates: Partial<Pick<CadMotorDevice, "motorName" | "motorType">>,
@@ -894,6 +950,7 @@ export const {
   setModelOrientation,
   selectMotionDirection,
   upsertBehavior,
+  deleteBehaviorForPart,
   updateCadMotorDevice,
   setMotorPower,
   setMotorPowers,

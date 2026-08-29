@@ -30,6 +30,7 @@ import {
   setAvailableParts,
   setPickMode,
   setModelOrientation,
+  resetTransforms,
   useCadStore,
 } from "./cadStore";
 import type { Axis, ModelOrientation, MotionType } from "./types";
@@ -958,6 +959,13 @@ export function CadViewer({ mode = "editor" }: CadViewerProps) {
       <div className="viewer-status">
         {selectedPartName ? `Selected: ${selectedPartName}` : "No part selected"}
       </div>
+      <button
+        className="viewer-reset-button"
+        type="button"
+        onClick={resetTransforms}
+      >
+        Reset positions
+      </button>
     </section>
   );
 }

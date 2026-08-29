@@ -210,9 +210,9 @@ h2 {
 
 .driver-robot-panel .viewer-status {
   position: absolute;
-  right: 16px;
+  left: 16px;
   bottom: 16px;
-  max-width: calc(100% - 32px);
+  max-width: calc(100% - 190px);
   overflow: hidden;
   border: 1px solid #303746;
   border-radius: 6px;
@@ -222,6 +222,25 @@ h2 {
   font-size: 13px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.driver-robot-panel .viewer-reset-button {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  min-height: 38px;
+  border: 1px solid #3b4658;
+  border-radius: 6px;
+  padding: 8px 12px;
+  color: #dbe5f2;
+  background: rgba(32, 39, 52, 0.92);
+  font-weight: 700;
+}
+
+.driver-robot-panel .viewer-reset-button:hover {
+  border-color: #5d9bff;
+  color: #ffffff;
+  background: #2f68c5;
 }
 
 .field-panel canvas {

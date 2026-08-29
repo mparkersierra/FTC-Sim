@@ -1,7 +1,8 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   canonicalCadPartName,
-  resetTransforms,
+  deleteBehaviorForPart,
+  selectPart,
   setMotorPower,
   setMotionDraft,
   upsertBehavior,
@@ -37,12 +38,19 @@ export function MotionPanel() {
     ),
   );
   const motionConfig = useCadStore((store) => store.motionConfig);
+  const cadMotorDevices = useCadStore((store) => store.cadMotorDevices);
   const motorState = useCadStore((store) => store.motorState);
   const motionDraft = useCadStore((store) => store.motionDraft);
+  const [maxPowerInput, setMaxPowerInput] = useState(String(motionDraft.maxPower));
   const behaviorMotorNames = useMemo(
     () => motionConfig.behaviors.map((item) => item.motorName),
     [motionConfig],
   );
+  const parsedMaxPower = Number(maxPowerInput);
+  const canSaveBehavior =
+    Boolean(selectedPartName && motionDraft.motorName.trim()) &&
+    maxPowerInput.trim() !== "" &&
+    Number.isFinite(parsedMaxPower);
 
   useEffect(() => {
     if (!selectedPartName) {
@@ -58,6 +66,7 @@ export function MotionPanel() {
       speed: 1,
       maxPower: behavior?.maxPower ?? 1,
     });
+    setMaxPowerInput(String(behavior?.maxPower ?? 1));
   }, [behavior, behaviorMotorNames, selectedPartName]);
 
   const motorPower = useMemo(() => {
@@ -67,7 +76,7 @@ export function MotionPanel() {
   function saveBehavior() {
     const trimmedMotorName = motionDraft.motorName.trim();
 
-    if (!selectedPartName || !trimmedMotorName) {
+    if (!selectedPartName || !trimmedMotorName || !canSaveBehavior) {
       return;
     }
 
@@ -80,8 +89,32 @@ export function MotionPanel() {
       axis: motionDraft.axis,
       positiveDirectionSign: motionDraft.positiveDirectionSign,
       speed: 1,
-      maxPower: motionDraft.maxPower,
+      maxPower: parsedMaxPower,
     });
+  }
+
+  function deleteSelectedBehavior() {
+    if (selectedPartName) {
+      deleteBehaviorForPart(selectedPartName);
+    }
+  }
+
+  function selectMotorDevice(partNames: string[]) {
+    if (partNames.length === 0) {
+      return;
+    }
+
+    const selectedIndex = selectedPartName
+      ? partNames.findIndex((partName) => partName === selectedPartName)
+      : -1;
+    const nextIndex = selectedIndex >= 0
+      ? (selectedIndex + 1) % partNames.length
+      : 0;
+    const firstPartName = partNames[nextIndex];
+
+    if (firstPartName) {
+      selectPart(firstPartName);
+    }
   }
 
   return (
@@ -90,89 +123,127 @@ export function MotionPanel() {
         <h2>Motion</h2>
       </header>
 
-      <section className="field-group">
-        <label>
-          <span>Selected part</span>
-          <output>{selectedPartName ?? "None"}</output>
-        </label>
-      </section>
+      {selectedPartName ? (
+        <>
+          <section className="field-group">
+            <label>
+              <span>Selected part</span>
+              <output>{selectedPartName}</output>
+            </label>
+          </section>
 
-      <fieldset disabled={!selectedPartName}>
-        <label>
-          <span>Motor name</span>
-          <input
-            value={motionDraft.motorName}
-            onChange={(event) => setMotionDraft({ motorName: event.currentTarget.value })}
-            placeholder="armMotor"
-          />
-        </label>
+          <fieldset>
+            <label>
+              <span>Motor name</span>
+              <input
+                value={motionDraft.motorName}
+                onChange={(event) => setMotionDraft({ motorName: event.currentTarget.value })}
+                placeholder="armMotor"
+              />
+            </label>
 
-        <label>
-          <span>Motion type</span>
-          <select
-            value={motionDraft.type}
-            onChange={(event) =>
-              setMotionDraft({ type: event.currentTarget.value as MotionType })
-            }
-          >
-            <option value="rotate">Rotate</option>
-            <option value="translate">Translate</option>
-          </select>
-        </label>
+            <label>
+              <span>Motion type</span>
+              <select
+                value={motionDraft.type}
+                onChange={(event) =>
+                  setMotionDraft({ type: event.currentTarget.value as MotionType })
+                }
+              >
+                <option value="rotate">Rotate</option>
+                <option value="translate">Translate</option>
+              </select>
+            </label>
 
-        <label>
-          <span>Axis</span>
-          <select
-            value={motionDraft.axis}
-            onChange={(event) =>
-              setMotionDraft({ axis: event.currentTarget.value as Axis })
-            }
-          >
-            <option value="x">X</option>
-            <option value="y">Y</option>
-            <option value="z">Z</option>
-          </select>
-        </label>
+            <label>
+              <span>Axis</span>
+              <select
+                value={motionDraft.axis}
+                onChange={(event) =>
+                  setMotionDraft({ axis: event.currentTarget.value as Axis })
+                }
+              >
+                <option value="x">X</option>
+                <option value="y">Y</option>
+                <option value="z">Z</option>
+              </select>
+            </label>
 
-        <label>
-          <span>Max speed</span>
-          <input
-            max="1"
-            min="0"
-            step="0.01"
-            type="number"
-            value={motionDraft.maxPower}
-            onChange={(event) =>
-              setMotionDraft({ maxPower: event.currentTarget.valueAsNumber || 0 })
-            }
-          />
-        </label>
+            <label>
+              <span>Max speed</span>
+              <input
+                max="1"
+                min="-1"
+                step="0.01"
+                type="number"
+                value={maxPowerInput}
+                onChange={(event) => setMaxPowerInput(event.currentTarget.value)}
+              />
+            </label>
 
-        <button className="primary-action" type="button" onClick={saveBehavior}>
-          Save behavior
-        </button>
+            <button
+              className="primary-action"
+              disabled={!canSaveBehavior}
+              type="button"
+              onClick={saveBehavior}
+            >
+              {behavior ? "Update behavior" : "Save behavior"}
+            </button>
 
-        <label>
-          <span>Fake motor power</span>
-          <input
-            max="1"
-            min="-1"
-            step="0.01"
-            type="range"
-            value={motorPower}
-            onChange={(event) =>
-              setMotorPower(motionDraft.motorName, event.currentTarget.valueAsNumber)
-            }
-          />
-          <output>{motorPower.toFixed(2)}</output>
-        </label>
-      </fieldset>
+            {behavior ? (
+              <button
+                className="danger-action"
+                type="button"
+                onClick={deleteSelectedBehavior}
+              >
+                Delete part
+              </button>
+            ) : null}
 
-      <section className="field-group">
-        <button className="secondary-action" type="button" onClick={resetTransforms}>
-          Reset positions
-        </button>
-      </section>
+            <label>
+              <span>Fake motor power</span>
+              <input
+                max="1"
+                min="-1"
+                step="0.01"
+                type="range"
+                value={motorPower}
+                onChange={(event) =>
+                  setMotorPower(motionDraft.motorName, event.currentTarget.valueAsNumber)
+                }
+              />
+              <output>{motorPower.toFixed(2)}</output>
+            </label>
+          </fieldset>
+        </>
+      ) : (
+        <p className="empty-state">Select a part to assign a motor.</p>
+      )}
+
+      {cadMotorDevices.length > 0 ? (
+        <section className="configured-motors">
+          <h3>Configured motors</h3>
+          <div className="configured-motor-list">
+            {cadMotorDevices.map((device) => (
+              <button
+                className="configured-motor-item"
+                key={device.motorName}
+                type="button"
+                onClick={() => selectMotorDevice(device.partNames)}
+                title={
+                  device.partNames.length > 1
+                    ? "Click to cycle through parts"
+                    : "Click to select part"
+                }
+              >
+                <strong>{device.motorName}</strong>
+                <span>{device.partNames.length} {device.partNames.length === 1 ? "part" : "parts"}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
     </aside>
   );
 }

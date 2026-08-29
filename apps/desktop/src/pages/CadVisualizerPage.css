@@ -145,13 +145,32 @@
   position: absolute;
   left: 16px;
   bottom: 16px;
-  max-width: calc(100% - 32px);
+  max-width: calc(100% - 190px);
   border: 1px solid #303746;
   border-radius: 6px;
   padding: 8px 10px;
   color: #aeb8c8;
   background: rgba(18, 21, 28, 0.86);
   font-size: 13px;
+}
+
+.cad-visualizer-page .viewer-reset-button {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  min-height: 38px;
+  border: 1px solid #3b4658;
+  border-radius: 6px;
+  padding: 8px 12px;
+  color: #dbe5f2;
+  background: rgba(32, 39, 52, 0.92);
+  font-weight: 700;
+}
+
+.cad-visualizer-page .viewer-reset-button:hover {
+  border-color: #5d9bff;
+  color: #ffffff;
+  background: #2f68c5;
 }
 
 .cad-visualizer-page .viewer-toolbar {
@@ -259,6 +278,60 @@
   opacity: 0.55;
 }
 
+.cad-visualizer-page .configured-motors {
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid #2b313d;
+  padding: 14px 16px 16px;
+}
+
+.cad-visualizer-page .configured-motors h3 {
+  margin: 0;
+  color: #98a4b5;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.cad-visualizer-page .configured-motor-list {
+  display: grid;
+  gap: 6px;
+}
+
+.cad-visualizer-page .configured-motor-item {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  border: 1px solid #303746;
+  border-radius: 6px;
+  padding: 8px 10px;
+  color: inherit;
+  background: #10141b;
+  text-align: left;
+}
+
+.cad-visualizer-page .configured-motor-item:hover {
+  border-color: #4d8dff;
+  background: #172235;
+}
+
+.cad-visualizer-page .configured-motor-item strong,
+.cad-visualizer-page .configured-motor-item span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cad-visualizer-page .configured-motor-item strong {
+  color: #edf2f8;
+  font-size: 13px;
+}
+
+.cad-visualizer-page .configured-motor-item span {
+  color: #98a4b5;
+  font-size: 12px;
+}
+
 .cad-visualizer-page .import-panel label,
 .cad-visualizer-page .motion-panel label {
   display: grid;
@@ -275,6 +348,45 @@
 
 .cad-visualizer-page .import-panel .checkbox-row input {
   width: auto;
+}
+
+.cad-visualizer-page .robot-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #303746;
+  border-radius: 6px;
+  padding: 10px;
+  background: #10141b;
+}
+
+.cad-visualizer-page .robot-summary div {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.cad-visualizer-page .robot-summary strong,
+.cad-visualizer-page .robot-summary span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cad-visualizer-page .robot-summary strong {
+  color: #edf2f8;
+  font-size: 14px;
+}
+
+.cad-visualizer-page .robot-summary span {
+  color: #98a4b5;
+  font-size: 12px;
+}
+
+.cad-visualizer-page .robot-summary .secondary-action {
+  min-width: 74px;
 }
 
 .cad-visualizer-page .import-panel input,
@@ -309,6 +421,15 @@
   font-weight: 700;
 }
 
+.cad-visualizer-page .danger-action {
+  min-height: 38px;
+  border: 1px solid #8f3a3a;
+  border-radius: 6px;
+  color: #ffd9d9;
+  background: #321b1f;
+  font-weight: 700;
+}
+
 .cad-visualizer-page .secondary-action {
   min-height: 38px;
   border: 1px solid #3b4658;
@@ -320,6 +441,12 @@
 
 .cad-visualizer-page .primary-action:hover {
   background: #3977dc;
+}
+
+.cad-visualizer-page .danger-action:hover {
+  border-color: #c65353;
+  color: #ffffff;
+  background: #54252b;
 }
 
 .cad-visualizer-page .primary-action:disabled,
@@ -375,6 +502,11 @@
 .cad-visualizer-page .generated-model-item:hover {
   border-color: #4d8dff;
   background: #172235;
+}
+
+.cad-visualizer-page .generated-model-item.active {
+  border-color: #4d8dff;
+  background: #203653;
 }
 
 .cad-visualizer-page .generated-model-item span,

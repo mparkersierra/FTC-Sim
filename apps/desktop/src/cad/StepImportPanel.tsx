@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { apiUrl, backendAssetUrl, cadBackendBaseUrl } from "./api";
 import { setExpandPattern, setModelUrl, useCadStore } from "./cadStore";
 
@@ -63,9 +63,11 @@ interface GeneratedModelsResponse {
 
 export function StepImportPanel() {
   const modelUrl = useCadStore((store) => store.modelUrl);
+  const availableParts = useCadStore((store) => store.availableParts);
   const [backendBaseUrl, setBackendBaseUrl] = useState("http://127.0.0.1:8087");
   const [stepFile, setStepFile] = useState<File | null>(null);
   const [jobName, setJobName] = useState("robot");
+  const [isManagingRobot, setIsManagingRobot] = useState(false);
   const [qualityPreset, setQualityPreset] = useState<QualityPreset>("fast");
   const [skipPattern, setSkipPattern] = useState(
     "hardware,label,motor,servo,connector,screw,bolt,nut,washer,spacer,standoff,bearing,thread,fastener,pin,snap ring",
@@ -78,6 +80,12 @@ export function StepImportPanel() {
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [isConverting, setIsConverting] = useState(false);
   const [isInspecting, setIsInspecting] = useState(false);
+  const activeGeneratedModel = useMemo(() => {
+    const activePath = normalizedModelPath(modelUrl);
+
+    return generatedModels.find((model) => normalizedModelPath(model.modelUrl) === activePath) ?? null;
+  }, [generatedModels, modelUrl]);
+  const activeRobotName = activeGeneratedModel?.name ?? modelNameFromUrl(modelUrl);
 
   useEffect(() => {
     let cancelled = false;
@@ -122,6 +130,7 @@ export function StepImportPanel() {
   function loadGeneratedModel(model: GeneratedModel) {
     setModelUrl(`${backendAssetUrl(backendBaseUrl, model.modelUrl)}?v=${model.modifiedAt || Date.now()}`);
     setStatus(`Loaded existing model ${model.name}.`);
+    setIsManagingRobot(false);
   }
 
   async function convertStep() {
@@ -163,6 +172,7 @@ export function StepImportPanel() {
       setModelUrl(`${backendAssetUrl(backendBaseUrl, payload.modelUrl)}?v=${Date.now()}`);
       setExpandPattern(expandPatternInput);
       setStatus(`Loaded ${payload.parts.length} parts from ${payload.modelUrl}.`);
+      setIsManagingRobot(false);
       await loadGeneratedModels();
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Conversion failed.");
@@ -210,136 +220,160 @@ export function StepImportPanel() {
   return (
     <section className="import-panel">
       <header className="subpanel-header">
-        <h3>STEP Import</h3>
+        <h3>Robot</h3>
       </header>
 
-      <label>
-        <span>STEP file</span>
-        <input
-          accept=".step,.stp"
-          type="file"
-          onChange={(event) => {
-            setStepFile(event.currentTarget.files?.[0] ?? null);
-          }}
-        />
-      </label>
-
-      <label>
-        <span>Job name</span>
-        <input
-          value={jobName}
-          onChange={(event) => setJobName(event.currentTarget.value)}
-          placeholder="robot"
-        />
-      </label>
-
-      <label>
-        <span>Import quality</span>
-        <select
-          value={qualityPreset}
-          onChange={(event) => {
-            const nextPreset = event.currentTarget.value as QualityPreset;
-            setQualityPreset(nextPreset);
-            setMinBboxMm(qualitySettings[nextPreset].minBboxMm);
-          }}
-        >
-          {Object.entries(qualitySettings).map(([value, setting]) => (
-            <option key={value} value={value}>
-              {setting.label}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <label>
-        <span>Skip names containing</span>
-        <input
-          value={skipPattern}
-          onChange={(event) => setSkipPattern(event.currentTarget.value)}
-          placeholder="screw,bolt,nut,washer"
-        />
-      </label>
-
-      <label>
-        <span>Expand names containing</span>
-        <input
-          value={expandPatternInput}
-          onChange={(event) => setExpandPatternInput(event.currentTarget.value)}
-          placeholder="chassis,drive,5103"
-        />
-      </label>
-
-      <label>
-        <span>Minimum part size mm</span>
-        <input
-          min="0"
-          step="0.5"
-          type="number"
-          value={minBboxMm}
-          onChange={(event) => setMinBboxMm(event.currentTarget.valueAsNumber || 0)}
-        />
-      </label>
-
-      <button
-        className="primary-action"
-        disabled={isConverting}
-        type="button"
-        onClick={convertStep}
-      >
-        {isConverting ? "Converting..." : "Convert STEP"}
-      </button>
-
-      <button
-        className="secondary-action"
-        disabled={isInspecting}
-        type="button"
-        onClick={inspectStep}
-      >
-        {isInspecting ? "Inspecting..." : "Inspect hierarchy"}
-      </button>
-
-      <section className="generated-models">
-        <div className="generated-models-header">
-          <span>Existing models</span>
-          <button
-            className="text-action"
-            disabled={isLoadingModels}
-            type="button"
-            onClick={() => {
-              void loadGeneratedModels();
-            }}
-          >
-            {isLoadingModels ? "Refreshing..." : "Refresh"}
-          </button>
+      <section className="robot-summary">
+        <div>
+          <strong>{activeRobotName}</strong>
+          <span>{availableParts.length > 0 ? `${availableParts.length} selectable parts` : "Loading parts..."}</span>
         </div>
-
-        {generatedModels.length > 0 ? (
-          <div className="generated-model-list">
-            {generatedModels.map((model) => (
-              <button
-                className="generated-model-item"
-                key={model.modelUrl}
-                type="button"
-                onClick={() => loadGeneratedModel(model)}
-              >
-                <span>{model.name}</span>
-                <small>
-                  {formatBytes(model.sizeBytes)}
-                  {model.modifiedAt ? ` · ${formatDate(model.modifiedAt)}` : ""}
-                </small>
-              </button>
-            ))}
-          </div>
-        ) : (
-          <p className="empty-generated-models">
-            {isLoadingModels ? "Loading generated models..." : "No generated models found."}
-          </p>
-        )}
+        <button
+          className="secondary-action"
+          type="button"
+          onClick={() => setIsManagingRobot((current) => !current)}
+        >
+          {isManagingRobot ? "Done" : "Change"}
+        </button>
       </section>
 
-      <div className="model-url">{modelUrl}</div>
+      {isManagingRobot ? (
+        <>
+          <label>
+            <span>STEP file</span>
+            <input
+              accept=".step,.stp"
+              type="file"
+              onChange={(event) => {
+                setStepFile(event.currentTarget.files?.[0] ?? null);
+              }}
+            />
+          </label>
+
+          <label>
+            <span>Job name</span>
+            <input
+              value={jobName}
+              onChange={(event) => setJobName(event.currentTarget.value)}
+              placeholder="robot"
+            />
+          </label>
+
+          <label>
+            <span>Import quality</span>
+            <select
+              value={qualityPreset}
+              onChange={(event) => {
+                const nextPreset = event.currentTarget.value as QualityPreset;
+                setQualityPreset(nextPreset);
+                setMinBboxMm(qualitySettings[nextPreset].minBboxMm);
+              }}
+            >
+              {Object.entries(qualitySettings).map(([value, setting]) => (
+                <option key={value} value={value}>
+                  {setting.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            <span>Skip names containing</span>
+            <input
+              value={skipPattern}
+              onChange={(event) => setSkipPattern(event.currentTarget.value)}
+              placeholder="screw,bolt,nut,washer"
+            />
+          </label>
+
+          <label>
+            <span>Expand names containing</span>
+            <input
+              value={expandPatternInput}
+              onChange={(event) => setExpandPatternInput(event.currentTarget.value)}
+              placeholder="chassis,drive,5103"
+            />
+          </label>
+
+          <label>
+            <span>Minimum part size mm</span>
+            <input
+              min="0"
+              step="0.5"
+              type="number"
+              value={minBboxMm}
+              onChange={(event) => setMinBboxMm(event.currentTarget.valueAsNumber || 0)}
+            />
+          </label>
+
+          <button
+            className="primary-action"
+            disabled={isConverting}
+            type="button"
+            onClick={convertStep}
+          >
+            {isConverting ? "Converting..." : "Convert STEP"}
+          </button>
+
+          <button
+            className="secondary-action"
+            disabled={isInspecting}
+            type="button"
+            onClick={inspectStep}
+          >
+            {isInspecting ? "Inspecting..." : "Inspect hierarchy"}
+          </button>
+
+          <section className="generated-models">
+            <div className="generated-models-header">
+              <span>Existing models</span>
+              <button
+                className="text-action"
+                disabled={isLoadingModels}
+                type="button"
+                onClick={() => {
+                  void loadGeneratedModels();
+                }}
+              >
+                {isLoadingModels ? "Refreshing..." : "Refresh"}
+              </button>
+            </div>
+
+            {generatedModels.length > 0 ? (
+              <div className="generated-model-list">
+                {generatedModels.map((model) => {
+                  const isActive =
+                    normalizedModelPath(model.modelUrl) === normalizedModelPath(modelUrl);
+
+                  return (
+                    <button
+                      className={isActive ? "generated-model-item active" : "generated-model-item"}
+                      key={model.modelUrl}
+                      type="button"
+                      onClick={() => loadGeneratedModel(model)}
+                    >
+                      <span>{model.name}</span>
+                      <small>
+                        {isActive ? "Current · " : ""}
+                        {formatBytes(model.sizeBytes)}
+                        {model.modifiedAt ? ` · ${formatDate(model.modifiedAt)}` : ""}
+                      </small>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="empty-generated-models">
+                {isLoadingModels ? "Loading generated models..." : "No generated models found."}
+              </p>
+            )}
+          </section>
+
+          <div className="model-url">{modelUrl}</div>
+        </>
+      ) : null}
       {status ? <p className="import-status">{status}</p> : null}
-      {treeText ? <pre className="tree-preview">{treeText}</pre> : null}
+      {isManagingRobot && treeText ? <pre className="tree-preview">{treeText}</pre> : null}
     </section>
   );
 }
@@ -384,4 +418,31 @@ function formatDate(timestamp: number) {
     hour: "numeric",
     minute: "2-digit",
   });
+}
+
+function normalizedModelPath(url: string) {
+  const trimmedUrl = url.trim();
+
+  if (!trimmedUrl) {
+    return "";
+  }
+
+  try {
+    return new URL(trimmedUrl, window.location.origin).pathname;
+  } catch {
+    return trimmedUrl.split("?")[0].split("#")[0];
+  }
+}
+
+function modelNameFromUrl(url: string) {
+  const path = normalizedModelPath(url);
+  const pathParts = path.split("/").filter(Boolean);
+  const fileName = pathParts[pathParts.length - 1] ?? "Robot";
+  const baseName = fileName.replace(/\.[^.]+$/, "");
+
+  return baseName
+    .split(/[-_]+/g)
+    .filter(Boolean)
+    .map((part) => part[0].toUpperCase() + part.slice(1))
+    .join(" ") || "Robot";
 }
