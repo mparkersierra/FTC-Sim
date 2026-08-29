@@ -9,7 +9,6 @@ FTC Sim is split into a desktop shell, a Java simulator runner, reusable Java li
 - `apps/runner` - Java simulator runner process.
 - `apps/cad-backend` - Java CAD conversion backend used by the CAD Visualizer tab.
 - `libs/ftc-sdk-shim` - FTC SDK-compatible shim classes.
-- `libs/sim-core` - Shared simulator core code.
 - `native/cad-step-to-glb` - OpenCascade STEP-to-GLB converter used by the CAD backend.
 - `examples/teamcode` - Checked-in sample TeamCode.
 - `workspace/TeamCode` - Local editable TeamCode used by the app. Ignored by git.

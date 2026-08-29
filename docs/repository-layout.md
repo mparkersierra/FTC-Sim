@@ -8,7 +8,6 @@ FTC Sim is a multi-language monorepo. Keep checked-in source, local user code, a
 - `apps/runner` - Java simulator process launched by the desktop app.
 - `apps/cad-backend` - Java HTTP service for STEP upload, inspection, conversion, and generated CAD model assets.
 - `libs/ftc-sdk-shim` - Minimal FTC SDK-compatible API surface used by TeamCode.
-- `libs/sim-core` - Shared simulator domain code and hardware abstractions.
 - `native/cad-step-to-glb` - OpenCascade native converter invoked by `apps/cad-backend`.
 - `examples/teamcode` - Checked-in sample FTC TeamCode files.
 - `workspace/TeamCode` - Local editable TeamCode workspace created and used by the app. This is ignored by git.
