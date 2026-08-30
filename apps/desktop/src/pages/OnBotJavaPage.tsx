@@ -4,7 +4,7 @@ import type {
   MouseEvent as ReactMouseEvent,
   PointerEvent as ReactPointerEvent,
 } from "react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Editor from "@monaco-editor/react";
 import type { OnMount } from "@monaco-editor/react";
 import { teamCodeFileTemplates } from "../config";
@@ -65,7 +65,7 @@ type OnBotJavaPageProps = {
   onOpenCodeFile: (fileName: string) => void;
   onOpenTeamCodeExport: () => void;
   onOpenTeamCodeContextMenu: (
-    event: ReactMouseEvent<HTMLButtonElement>,
+    event: ReactMouseEvent<HTMLElement>,
     menu: Omit<TeamCodeContextMenu, "x" | "y">,
   ) => void;
   onRenameTeamCodeItem: () => void;
@@ -143,6 +143,7 @@ export function OnBotJavaPage({
   const [isUploadMenuOpen, setIsUploadMenuOpen] = useState(false);
   const [isGithubUploadFormOpen, setIsGithubUploadFormOpen] = useState(false);
   const [githubUploadUrl, setGithubUploadUrl] = useState("");
+  const dialogInputRef = useRef<HTMLInputElement | null>(null);
   const uploadZipInputRef = useRef<HTMLInputElement | null>(null);
   const activePointerDragRef = useRef<{
     item: TeamCodeDragItem;
@@ -293,6 +294,37 @@ export function OnBotJavaPage({
     teamCodeDialog?.kind === "createFile" || teamCodeDialog?.kind === "renameFile"
       ? teamCodeDialog.value.replace(/\.java$/i, "")
       : "";
+  const teamCodeDialogSelectionKey = teamCodeDialog
+    ? "parentFolder" in teamCodeDialog
+      ? `${teamCodeDialog.kind}:${teamCodeDialog.parentFolder}`
+      : `${teamCodeDialog.kind}:${teamCodeDialog.path}`
+    : "";
+
+  useEffect(() => {
+    if (
+      !teamCodeDialog ||
+      teamCodeDialog.kind === "deleteFile" ||
+      teamCodeDialog.kind === "deleteFolder"
+    ) {
+      return;
+    }
+
+    const input = dialogInputRef.current;
+    if (!input) {
+      return;
+    }
+
+    input.focus();
+    input.select();
+  }, [teamCodeDialogSelectionKey]);
+
+  const openRootTeamCodeContextMenu = (event: ReactMouseEvent<HTMLElement>) => {
+    if (event.target !== event.currentTarget) {
+      return;
+    }
+
+    onOpenTeamCodeContextMenu(event, { kind: "folder", path: "" });
+  };
 
   const renderTeamCodeFolder = (folder: string, depth: number) => (
     <div className="file-group" key={folder} data-teamcode-folder={folder}>
@@ -348,6 +380,7 @@ export function OnBotJavaPage({
           className="file-browser"
           data-dragging={draggedTeamCodeItem ? "true" : undefined}
           data-drop-target={hoveredTeamCodeDropFolder === "" ? "root" : undefined}
+          onContextMenu={openRootTeamCodeContextMenu}
         >
           <div className="file-browser-title">
             <div>
@@ -518,12 +551,16 @@ export function OnBotJavaPage({
                 </button>
               </>
             )}
-            <button onClick={onRenameTeamCodeItem} type="button">
-              Rename
-            </button>
-            <button onClick={onDeleteTeamCodeItem} type="button">
-              Delete
-            </button>
+            {teamCodeContextMenu.path ? (
+              <>
+                <button onClick={onRenameTeamCodeItem} type="button">
+                  Rename
+                </button>
+                <button onClick={onDeleteTeamCodeItem} type="button">
+                  Delete
+                </button>
+              </>
+            ) : null}
           </div>
         )}
 
@@ -553,8 +590,12 @@ export function OnBotJavaPage({
                         <span>{teamCodeDialog.path.slice(0, teamCodeDialog.path.lastIndexOf("/") + 1)}</span>
                       )}
                       <input
+                        autoCapitalize="none"
+                        autoCorrect="off"
                         autoFocus
+                        ref={dialogInputRef}
                         onChange={(event) => onUpdateTeamCodeDialogValue(event.target.value.replace(/\.java$/i, ""))}
+                        spellCheck={false}
                         value={fileDialogStem}
                       />
                       <span className="teamcode-fixed-extension">.java</span>
@@ -563,15 +604,23 @@ export function OnBotJavaPage({
                     <div className="teamcode-path-input">
                       <span>{teamCodeDialog.parentFolder}/</span>
                       <input
+                        autoCapitalize="none"
+                        autoCorrect="off"
                         autoFocus
+                        ref={dialogInputRef}
                         onChange={(event) => onUpdateTeamCodeDialogValue(event.target.value)}
+                        spellCheck={false}
                         value={teamCodeDialog.value}
                       />
                     </div>
                   ) : (
                     <input
+                      autoCapitalize="none"
+                      autoCorrect="off"
                       autoFocus
+                      ref={dialogInputRef}
                       onChange={(event) => onUpdateTeamCodeDialogValue(event.target.value)}
+                      spellCheck={false}
                       value={teamCodeDialog.value}
                     />
                   )}

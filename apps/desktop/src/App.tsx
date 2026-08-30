@@ -694,7 +694,7 @@ function App() {
   };
 
   const openTeamCodeContextMenu = (
-    event: ReactMouseEvent<HTMLButtonElement>,
+    event: ReactMouseEvent<HTMLElement>,
     menu: Omit<TeamCodeContextMenu, "x" | "y">,
   ) => {
     event.preventDefault();

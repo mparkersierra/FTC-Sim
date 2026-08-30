@@ -137,9 +137,12 @@ export function MotionPanel() {
             <label>
               <span>Hardware name</span>
               <input
+                autoCapitalize="none"
+                autoCorrect="off"
                 value={motionDraft.motorName}
                 onChange={(event) => setMotionDraft({ motorName: event.currentTarget.value })}
                 placeholder="armMotor"
+                spellCheck={false}
               />
             </label>
 

@@ -62,8 +62,11 @@ export function ConfigurationPage({
             </select>
 
             <input
+              autoCapitalize="none"
+              autoCorrect="off"
               onChange={(event) => onUpdateHardwareRow(index, { name: event.target.value })}
               placeholder="hardware name"
+              spellCheck={false}
               value={item.name}
             />
 
@@ -95,8 +98,11 @@ export function ConfigurationPage({
               </select>
 
               <input
+                autoCapitalize="none"
+                autoCorrect="off"
                 onChange={(event) => onUpdateCadMotorDevice(item.motorName, { motorName: event.target.value })}
                 placeholder="motor name"
+                spellCheck={false}
                 value={item.motorName}
               />
             </div>
