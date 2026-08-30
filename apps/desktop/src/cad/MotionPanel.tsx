@@ -170,7 +170,7 @@ export function MotionPanel() {
             </label>
 
             <label>
-              <span>Max speed</span>
+              <span>Max power</span>
               <input
                 max="1"
                 min="-1"

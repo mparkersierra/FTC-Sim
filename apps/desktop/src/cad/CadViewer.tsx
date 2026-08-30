@@ -57,6 +57,8 @@ const axisColors: Record<Axis, string> = {
   y: "#4ade80",
   z: "#60a5fa",
 };
+const fullPowerRotationRadiansPerSecond = 2;
+const fullPowerTranslationDistancePerSecond = 2;
 
 const translateDirections: DirectionOption[] = [
   { axis: "x", sign: 1, direction: new Vector3(1, 0, 0), color: axisColors.x },
@@ -765,14 +767,14 @@ function CadScene({
         translateAlongLocalAxis(
           object,
           behavior.axis,
-          motorPower * deltaTime,
+          motorPower * fullPowerTranslationDistancePerSecond * deltaTime,
         );
         continue;
       }
 
       const currentValue = getAxisValue(object, behavior.axis, behavior.type);
       const nextValue = clamp(
-        currentValue + motorPower * deltaTime,
+        currentValue + motorPower * fullPowerRotationRadiansPerSecond * deltaTime,
         behavior.min,
         behavior.max,
       );

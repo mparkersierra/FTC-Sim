@@ -1,8 +1,6 @@
 package com.mparkersierra.ftcsim.runner.simulation;
 
 import com.mparkersierra.ftcsim.runner.hardware.SimHardwareRegistry;
-import com.qualcomm.robotcore.hardware.DcMotor;
-
 import java.util.Map;
 import java.util.function.Consumer;
 
@@ -36,6 +34,7 @@ public class DrivetrainSimulation {
             double dt = (nowNano - lastTime) / 1_000_000_000.0;
             lastTime = nowNano;
 
+            hardwareRegistry.update(dt);
             update(dt);
             broadcaster.broadcast(robotPose.x, robotPose.y, robotPose.heading);
             motorPowerBroadcaster.accept(hardwareRegistry.motorPowers());
@@ -45,24 +44,10 @@ public class DrivetrainSimulation {
     }
 
     private void update(double dt) {
-        DcMotor leftFront = hardwareRegistry.getMotor("leftFront");
-        DcMotor rightFront = hardwareRegistry.getMotor("rightFront");
-        DcMotor leftBack = hardwareRegistry.getMotor("leftBack");
-        DcMotor rightBack = hardwareRegistry.getMotor("rightBack");
-
-        if (
-            leftFront == null ||
-            rightFront == null ||
-            leftBack == null ||
-            rightBack == null
-        ) {
-            return;
-        }
-
-        double lf = leftFront.getAppliedPower();
-        double rf = rightFront.getAppliedPower();
-        double lb = leftBack.getAppliedPower();
-        double rb = rightBack.getAppliedPower();
+        double lf = hardwareRegistry.motorPower("leftFront");
+        double rf = hardwareRegistry.motorPower("rightFront");
+        double lb = hardwareRegistry.motorPower("leftBack");
+        double rb = hardwareRegistry.motorPower("rightBack");
 
         double forward = (-lf + rf - lb + rb) / 4.0;
         double strafe = (-lf - rf + lb + rb) / 4.0;

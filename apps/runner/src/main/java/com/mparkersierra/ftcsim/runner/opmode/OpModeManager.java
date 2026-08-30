@@ -67,6 +67,7 @@ public class OpModeManager {
 
     public synchronized void start() {
         if (currentOpMode != null) {
+            hardwareRegistry.setOpModeActive(true);
             currentOpMode.internalStart();
         }
     }
@@ -79,6 +80,7 @@ public class OpModeManager {
             currentOpMode.stop();
         }
 
+        hardwareRegistry.setOpModeActive(false);
         hardwareRegistry.stopAllMotors();
 
         if (opModeThread != null) {
@@ -147,6 +149,7 @@ public class OpModeManager {
 
         opMode.requestOpModeStop();
         opMode.stop();
+        hardwareRegistry.setOpModeActive(false);
         hardwareRegistry.stopAllMotors();
         clearCurrentOpMode();
         notifyStopped();

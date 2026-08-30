@@ -208,6 +208,232 @@ export const generatedFtcJavaApi: GeneratedJavaType[] =
     "simpleName": "DcMotor",
     "fullName": "com.qualcomm.robotcore.hardware.DcMotor",
     "detail": "FTC Java class DcMotor",
+    "extendsName": "DcMotorSimple",
+    "members": [
+      {
+        "kind": "field",
+        "label": "SIM_MAX_TICKS_PER_SECOND",
+        "detail": "double SIM_MAX_TICKS_PER_SECOND",
+        "insertText": "SIM_MAX_TICKS_PER_SECOND"
+      },
+      {
+        "kind": "method",
+        "label": "setMode",
+        "detail": "void setMode(RunMode mode)",
+        "insertText": "setMode($1)"
+      },
+      {
+        "kind": "method",
+        "label": "getMode",
+        "detail": "RunMode getMode()",
+        "insertText": "getMode($1)"
+      },
+      {
+        "kind": "method",
+        "label": "setTargetPosition",
+        "detail": "void setTargetPosition(int position)",
+        "insertText": "setTargetPosition($1)"
+      },
+      {
+        "kind": "method",
+        "label": "getTargetPosition",
+        "detail": "int getTargetPosition()",
+        "insertText": "getTargetPosition($1)"
+      },
+      {
+        "kind": "method",
+        "label": "getCurrentPosition",
+        "detail": "int getCurrentPosition()",
+        "insertText": "getCurrentPosition($1)"
+      },
+      {
+        "kind": "method",
+        "label": "isBusy",
+        "detail": "boolean isBusy()",
+        "insertText": "isBusy($1)"
+      },
+      {
+        "kind": "method",
+        "label": "getSimulatedAppliedPower",
+        "detail": "double getSimulatedAppliedPower()",
+        "insertText": "getSimulatedAppliedPower($1)"
+      },
+      {
+        "kind": "method",
+        "label": "updateSimulatedPosition",
+        "detail": "void updateSimulatedPosition(double seconds)",
+        "insertText": "updateSimulatedPosition($1)"
+      },
+      {
+        "kind": "method",
+        "label": "setZeroPowerBehavior",
+        "detail": "void setZeroPowerBehavior(ZeroPowerBehavior zeroPowerBehavior)",
+        "insertText": "setZeroPowerBehavior($1)"
+      },
+      {
+        "kind": "method",
+        "label": "getZeroPowerBehavior",
+        "detail": "ZeroPowerBehavior getZeroPowerBehavior()",
+        "insertText": "getZeroPowerBehavior($1)"
+      }
+    ]
+  },
+  {
+    "kind": "enum",
+    "simpleName": "RunMode",
+    "fullName": "com.qualcomm.robotcore.hardware.DcMotor.RunMode",
+    "detail": "FTC Java enum RunMode",
+    "enumValues": [
+      "RUN_WITHOUT_ENCODER",
+      "RUN_USING_ENCODER",
+      "RUN_TO_POSITION",
+      "STOP_AND_RESET_ENCODER"
+    ]
+  },
+  {
+    "kind": "enum",
+    "simpleName": "ZeroPowerBehavior",
+    "fullName": "com.qualcomm.robotcore.hardware.DcMotor.ZeroPowerBehavior",
+    "detail": "FTC Java enum ZeroPowerBehavior",
+    "enumValues": [
+      "BRAKE",
+      "FLOAT"
+    ]
+  },
+  {
+    "kind": "class",
+    "simpleName": "DcMotorEx",
+    "fullName": "com.qualcomm.robotcore.hardware.DcMotorEx",
+    "detail": "FTC Java class DcMotorEx",
+    "extendsName": "DcMotor",
+    "members": [
+      {
+        "kind": "field",
+        "label": "SIM_MAX_ANGULAR_RATE_RADIANS_PER_SECOND",
+        "detail": "double SIM_MAX_ANGULAR_RATE_RADIANS_PER_SECOND",
+        "insertText": "SIM_MAX_ANGULAR_RATE_RADIANS_PER_SECOND"
+      },
+      {
+        "kind": "method",
+        "label": "setMotorEnable",
+        "detail": "void setMotorEnable()",
+        "insertText": "setMotorEnable($1)"
+      },
+      {
+        "kind": "method",
+        "label": "setMotorDisable",
+        "detail": "void setMotorDisable()",
+        "insertText": "setMotorDisable($1)"
+      },
+      {
+        "kind": "method",
+        "label": "isMotorEnabled",
+        "detail": "boolean isMotorEnabled()",
+        "insertText": "isMotorEnabled($1)"
+      },
+      {
+        "kind": "method",
+        "label": "setVelocity",
+        "detail": "void setVelocity(double angularRate)",
+        "insertText": "setVelocity($1)"
+      },
+      {
+        "kind": "method",
+        "label": "setVelocity",
+        "detail": "void setVelocity(double angularRate, AngleUnit unit)",
+        "insertText": "setVelocity($1)"
+      },
+      {
+        "kind": "method",
+        "label": "getVelocity",
+        "detail": "double getVelocity()",
+        "insertText": "getVelocity($1)"
+      },
+      {
+        "kind": "method",
+        "label": "getVelocity",
+        "detail": "double getVelocity(AngleUnit unit)",
+        "insertText": "getVelocity($1)"
+      },
+      {
+        "kind": "method",
+        "label": "setPIDCoefficients",
+        "detail": "void setPIDCoefficients(RunMode mode, PIDCoefficients pidCoefficients)",
+        "insertText": "setPIDCoefficients($1)"
+      },
+      {
+        "kind": "method",
+        "label": "setPIDFCoefficients",
+        "detail": "void setPIDFCoefficients(RunMode mode, PIDFCoefficients pidfCoefficients)",
+        "insertText": "setPIDFCoefficients($1)"
+      },
+      {
+        "kind": "method",
+        "label": "setVelocityPIDFCoefficients",
+        "detail": "void setVelocityPIDFCoefficients(double p, double i, double d, double f)",
+        "insertText": "setVelocityPIDFCoefficients($1)"
+      },
+      {
+        "kind": "method",
+        "label": "setPositionPIDFCoefficients",
+        "detail": "void setPositionPIDFCoefficients(double p)",
+        "insertText": "setPositionPIDFCoefficients($1)"
+      },
+      {
+        "kind": "method",
+        "label": "getPIDCoefficients",
+        "detail": "PIDCoefficients getPIDCoefficients(RunMode mode)",
+        "insertText": "getPIDCoefficients($1)"
+      },
+      {
+        "kind": "method",
+        "label": "getPIDFCoefficients",
+        "detail": "PIDFCoefficients getPIDFCoefficients(RunMode mode)",
+        "insertText": "getPIDFCoefficients($1)"
+      },
+      {
+        "kind": "method",
+        "label": "setTargetPositionTolerance",
+        "detail": "void setTargetPositionTolerance(int tolerance)",
+        "insertText": "setTargetPositionTolerance($1)"
+      },
+      {
+        "kind": "method",
+        "label": "getTargetPositionTolerance",
+        "detail": "int getTargetPositionTolerance()",
+        "insertText": "getTargetPositionTolerance($1)"
+      },
+      {
+        "kind": "method",
+        "label": "getCurrent",
+        "detail": "double getCurrent(CurrentUnit unit)",
+        "insertText": "getCurrent($1)"
+      },
+      {
+        "kind": "method",
+        "label": "getCurrentAlert",
+        "detail": "double getCurrentAlert(CurrentUnit unit)",
+        "insertText": "getCurrentAlert($1)"
+      },
+      {
+        "kind": "method",
+        "label": "setCurrentAlert",
+        "detail": "void setCurrentAlert(double current, CurrentUnit unit)",
+        "insertText": "setCurrentAlert($1)"
+      },
+      {
+        "kind": "method",
+        "label": "isOverCurrent",
+        "detail": "boolean isOverCurrent()",
+        "insertText": "isOverCurrent($1)"
+      }
+    ]
+  },
+  {
+    "kind": "class",
+    "simpleName": "DcMotorSimple",
+    "fullName": "com.qualcomm.robotcore.hardware.DcMotorSimple",
+    "detail": "FTC Java class DcMotorSimple",
     "members": [
       {
         "kind": "method",
@@ -244,7 +470,7 @@ export const generatedFtcJavaApi: GeneratedJavaType[] =
   {
     "kind": "enum",
     "simpleName": "Direction",
-    "fullName": "com.qualcomm.robotcore.hardware.DcMotor.Direction",
+    "fullName": "com.qualcomm.robotcore.hardware.DcMotorSimple.Direction",
     "detail": "FTC Java enum Direction",
     "enumValues": [
       "FORWARD",
@@ -388,6 +614,62 @@ export const generatedFtcJavaApi: GeneratedJavaType[] =
     ]
   },
   {
+    "kind": "class",
+    "simpleName": "PIDCoefficients",
+    "fullName": "com.qualcomm.robotcore.hardware.PIDCoefficients",
+    "detail": "FTC Java class PIDCoefficients",
+    "members": [
+      {
+        "kind": "field",
+        "label": "p",
+        "detail": "double p",
+        "insertText": "p"
+      },
+      {
+        "kind": "field",
+        "label": "i",
+        "detail": "double i",
+        "insertText": "i"
+      },
+      {
+        "kind": "field",
+        "label": "d",
+        "detail": "double d",
+        "insertText": "d"
+      }
+    ]
+  },
+  {
+    "kind": "class",
+    "simpleName": "PIDFCoefficients",
+    "fullName": "com.qualcomm.robotcore.hardware.PIDFCoefficients",
+    "detail": "FTC Java class PIDFCoefficients",
+    "extendsName": "PIDCoefficients",
+    "members": [
+      {
+        "kind": "field",
+        "label": "f",
+        "detail": "double f",
+        "insertText": "f"
+      },
+      {
+        "kind": "field",
+        "label": "algorithm",
+        "detail": "MotorControlAlgorithm algorithm",
+        "insertText": "algorithm"
+      }
+    ]
+  },
+  {
+    "kind": "enum",
+    "simpleName": "MotorControlAlgorithm",
+    "fullName": "com.qualcomm.robotcore.hardware.PIDFCoefficients.MotorControlAlgorithm",
+    "detail": "FTC Java enum MotorControlAlgorithm",
+    "enumValues": [
+      "PIDF"
+    ]
+  },
+  {
     "kind": "enum",
     "simpleName": "AngleUnit",
     "fullName": "org.firstinspires.ftc.robotcore.external.navigation.AngleUnit",
@@ -415,6 +697,30 @@ export const generatedFtcJavaApi: GeneratedJavaType[] =
     "enumValues": [
       "RADIANS",
       "DEGREES"
+    ]
+  },
+  {
+    "kind": "enum",
+    "simpleName": "CurrentUnit",
+    "fullName": "org.firstinspires.ftc.robotcore.external.navigation.CurrentUnit",
+    "detail": "FTC Java enum CurrentUnit",
+    "members": [
+      {
+        "kind": "method",
+        "label": "toAmps",
+        "detail": "double toAmps(double value)",
+        "insertText": "toAmps($1)"
+      },
+      {
+        "kind": "method",
+        "label": "fromAmps",
+        "detail": "double fromAmps(double amps)",
+        "insertText": "fromAmps($1)"
+      }
+    ],
+    "enumValues": [
+      "AMPS",
+      "MILLIAMPS"
     ]
   },
   {
