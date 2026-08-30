@@ -111,18 +111,24 @@ public class SimWebSocketServer extends WebSocketServer {
     private void updateHardwareMap(String message) {
         hardwareRegistry.clear();
 
-        String marker = "{\"type\":\"DcMotor\",\"name\":\"";
+        addDevicesFromMessage(message, "DcMotor");
+        addDevicesFromMessage(message, "Servo");
+        addDevicesFromMessage(message, "CRServo");
+
+        System.out.println("Hardware map updated.");
+    }
+
+    private void addDevicesFromMessage(String message, String type) {
+        String marker = "{\"type\":\"" + type + "\",\"name\":\"";
         String[] parts = message.split(java.util.regex.Pattern.quote(marker));
 
         for (int i = 1; i < parts.length; i++) {
             String name = parts[i].split("\"")[0];
 
             if (!name.isBlank()) {
-                hardwareRegistry.addDevice("DcMotor", name);
+                hardwareRegistry.addDevice(type, name);
             }
         }
-
-        System.out.println("Hardware map updated.");
     }
 
     private String extract(String json, String field) {

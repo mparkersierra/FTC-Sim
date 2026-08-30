@@ -59,6 +59,9 @@ const axisColors: Record<Axis, string> = {
 };
 const fullPowerRotationRadiansPerSecond = 2;
 const fullPowerTranslationDistancePerSecond = 2;
+const servoMaxRotationRadians = 5 * Math.PI / 3;
+const servoMaxRotationRadiansPerSecond = 2;
+const servoMaxTranslationDistancePerSecond = 2;
 
 const translateDirections: DirectionOption[] = [
   { axis: "x", sign: 1, direction: new Vector3(1, 0, 0), color: axisColors.x },
@@ -170,6 +173,18 @@ function clamp(value: number, min?: number, max?: number) {
   }
 
   return next;
+}
+
+function moveToward(current: number, target: number, maxDelta: number) {
+  if (current < target) {
+    return Math.min(current + maxDelta, target);
+  }
+
+  if (current > target) {
+    return Math.max(current - maxDelta, target);
+  }
+
+  return current;
 }
 
 function axisVector(axis: Axis) {
@@ -666,6 +681,7 @@ function CadScene({
   const scene = useMemo(() => gltf.scene.clone(true), [gltf.scene]);
   const objectMapRef = useRef<ObjectMap>(new Map());
   const initialTransformsRef = useRef<Map<string, InitialTransform>>(new Map());
+  const servoPositionsRef = useRef<Map<string, number>>(new Map());
   const selectedPartName = useCadStore((store) => store.selectedPartName);
   const availableParts = useCadStore((store) => store.availableParts);
   const motionConfig = useCadStore((store) => store.motionConfig);
@@ -744,6 +760,7 @@ function CadScene({
       object.scale.copy(initialTransform.scale);
       object.updateMatrixWorld(true);
     }
+    servoPositionsRef.current.clear();
   }, [resetTransformsToken]);
 
   useFrame((_, deltaTime) => {
@@ -759,6 +776,59 @@ function CadScene({
         (motorState[behavior.motorName] ?? 0) *
         (behavior.maxPower ?? 1) *
         (behavior.positiveDirectionSign ?? 1);
+
+      if (behavior.motorType === "Servo") {
+        const initialTransform = initialTransformsRef.current.get(behavior.partName);
+        if (!initialTransform) {
+          continue;
+        }
+
+        if (!Object.prototype.hasOwnProperty.call(motorState, behavior.motorName)) {
+          continue;
+        }
+
+        const targetServoPosition = clamp(motorState[behavior.motorName] ?? 0, 0, 1);
+        const currentServoPosition = servoPositionsRef.current.get(behavior.id) ?? 0;
+        const maxServoDelta =
+          behavior.type === "translate"
+            ? servoMaxTranslationDistancePerSecond /
+              fullPowerTranslationDistancePerSecond *
+              deltaTime
+            : servoMaxRotationRadiansPerSecond / servoMaxRotationRadians * deltaTime;
+        const servoPosition = moveToward(
+          currentServoPosition,
+          targetServoPosition,
+          maxServoDelta,
+        );
+        const servoValue =
+          servoPosition *
+          (behavior.positiveDirectionSign ?? 1);
+        servoPositionsRef.current.set(behavior.id, servoPosition);
+
+        object.position.copy(initialTransform.position);
+        object.quaternion.copy(initialTransform.quaternion);
+        object.scale.copy(initialTransform.scale);
+        object.updateMatrixWorld(true);
+
+        if (behavior.type === "translate") {
+          translateAlongLocalAxis(
+            object,
+            behavior.axis,
+            servoValue * fullPowerTranslationDistancePerSecond,
+          );
+        } else {
+          const currentValue = getAxisValue(object, behavior.axis, behavior.type);
+          setAxisValue(
+            object,
+            behavior.axis,
+            behavior.type,
+            currentValue + servoValue * servoMaxRotationRadians,
+          );
+        }
+
+        continue;
+      }
+
       if (motorPower === 0) {
         continue;
       }

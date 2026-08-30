@@ -205,6 +205,27 @@ export const generatedFtcJavaApi: GeneratedJavaType[] =
   },
   {
     "kind": "class",
+    "simpleName": "CRServo",
+    "fullName": "com.qualcomm.robotcore.hardware.CRServo",
+    "detail": "FTC Java class CRServo",
+    "extendsName": "DcMotorSimple",
+    "members": [
+      {
+        "kind": "method",
+        "label": "getController",
+        "detail": "ServoController getController()",
+        "insertText": "getController($1)"
+      },
+      {
+        "kind": "method",
+        "label": "getPortNumber",
+        "detail": "int getPortNumber()",
+        "insertText": "getPortNumber($1)"
+      }
+    ]
+  },
+  {
+    "kind": "class",
     "simpleName": "DcMotor",
     "fullName": "com.qualcomm.robotcore.hardware.DcMotor",
     "detail": "FTC Java class DcMotor",
@@ -668,6 +689,102 @@ export const generatedFtcJavaApi: GeneratedJavaType[] =
     "enumValues": [
       "PIDF"
     ]
+  },
+  {
+    "kind": "class",
+    "simpleName": "Servo",
+    "fullName": "com.qualcomm.robotcore.hardware.Servo",
+    "detail": "FTC Java class Servo",
+    "members": [
+      {
+        "kind": "field",
+        "label": "MIN_POSITION",
+        "detail": "double MIN_POSITION",
+        "insertText": "MIN_POSITION"
+      },
+      {
+        "kind": "field",
+        "label": "MAX_POSITION",
+        "detail": "double MAX_POSITION",
+        "insertText": "MAX_POSITION"
+      },
+      {
+        "kind": "field",
+        "label": "SIM_MAX_RANGE_DEGREES",
+        "detail": "double SIM_MAX_RANGE_DEGREES",
+        "insertText": "SIM_MAX_RANGE_DEGREES"
+      },
+      {
+        "kind": "method",
+        "label": "getController",
+        "detail": "ServoController getController()",
+        "insertText": "getController($1)"
+      },
+      {
+        "kind": "method",
+        "label": "getPortNumber",
+        "detail": "int getPortNumber()",
+        "insertText": "getPortNumber($1)"
+      },
+      {
+        "kind": "method",
+        "label": "setDirection",
+        "detail": "void setDirection(Direction direction)",
+        "insertText": "setDirection($1)"
+      },
+      {
+        "kind": "method",
+        "label": "getDirection",
+        "detail": "Direction getDirection()",
+        "insertText": "getDirection($1)"
+      },
+      {
+        "kind": "method",
+        "label": "setPosition",
+        "detail": "void setPosition(double position)",
+        "insertText": "setPosition($1)"
+      },
+      {
+        "kind": "method",
+        "label": "getPosition",
+        "detail": "double getPosition()",
+        "insertText": "getPosition($1)"
+      },
+      {
+        "kind": "method",
+        "label": "scaleRange",
+        "detail": "void scaleRange(double min, double max)",
+        "insertText": "scaleRange($1)"
+      },
+      {
+        "kind": "method",
+        "label": "getSimulatedPosition",
+        "detail": "double getSimulatedPosition()",
+        "insertText": "getSimulatedPosition($1)"
+      },
+      {
+        "kind": "method",
+        "label": "getSimulatedAngleDegrees",
+        "detail": "double getSimulatedAngleDegrees()",
+        "insertText": "getSimulatedAngleDegrees($1)"
+      }
+    ]
+  },
+  {
+    "kind": "enum",
+    "simpleName": "Direction",
+    "fullName": "com.qualcomm.robotcore.hardware.Servo.Direction",
+    "detail": "FTC Java enum Direction",
+    "enumValues": [
+      "FORWARD",
+      "REVERSE"
+    ]
+  },
+  {
+    "kind": "class",
+    "simpleName": "ServoController",
+    "fullName": "com.qualcomm.robotcore.hardware.ServoController",
+    "detail": "FTC Java class ServoController"
   },
   {
     "kind": "enum",

@@ -247,7 +247,7 @@ function isDrillState(value: unknown): value is DrillState {
 }
 
 function isCadMotorType(value: unknown): value is CadMotorType {
-  return value === "DcMotor";
+  return value === "DcMotor" || value === "Servo" || value === "CRServo";
 }
 
 function isMotionType(value: unknown): value is MotionType {

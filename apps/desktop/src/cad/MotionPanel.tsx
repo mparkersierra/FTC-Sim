@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { hardwareTypes } from "../config";
 import {
   canonicalCadPartName,
   deleteBehaviorForPart,
@@ -49,8 +50,8 @@ export function MotionPanel() {
   const parsedMaxPower = Number(maxPowerInput);
   const canSaveBehavior =
     Boolean(selectedPartName && motionDraft.motorName.trim()) &&
-    maxPowerInput.trim() !== "" &&
-    Number.isFinite(parsedMaxPower);
+    (motionDraft.motorType === "Servo" ||
+      (maxPowerInput.trim() !== "" && Number.isFinite(parsedMaxPower)));
 
   useEffect(() => {
     if (!selectedPartName) {
@@ -89,7 +90,7 @@ export function MotionPanel() {
       axis: motionDraft.axis,
       positiveDirectionSign: motionDraft.positiveDirectionSign,
       speed: 1,
-      maxPower: parsedMaxPower,
+      maxPower: motionDraft.motorType === "Servo" ? 1 : parsedMaxPower,
     });
   }
 
@@ -134,12 +135,30 @@ export function MotionPanel() {
 
           <fieldset>
             <label>
-              <span>Motor name</span>
+              <span>Hardware name</span>
               <input
                 value={motionDraft.motorName}
                 onChange={(event) => setMotionDraft({ motorName: event.currentTarget.value })}
                 placeholder="armMotor"
               />
+            </label>
+
+            <label>
+              <span>Hardware type</span>
+              <select
+                value={motionDraft.motorType}
+                onChange={(event) =>
+                  setMotionDraft({
+                    motorType: event.currentTarget.value as typeof motionDraft.motorType,
+                  })
+                }
+              >
+                {hardwareTypes.map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </select>
             </label>
 
             <label>
@@ -169,17 +188,19 @@ export function MotionPanel() {
               </select>
             </label>
 
-            <label>
-              <span>Max power</span>
-              <input
-                max="1"
-                min="-1"
-                step="0.01"
-                type="number"
-                value={maxPowerInput}
-                onChange={(event) => setMaxPowerInput(event.currentTarget.value)}
-              />
-            </label>
+            {motionDraft.motorType === "Servo" ? null : (
+              <label>
+                <span>Max power</span>
+                <input
+                  max="1"
+                  min="-1"
+                  step="0.01"
+                  type="number"
+                  value={maxPowerInput}
+                  onChange={(event) => setMaxPowerInput(event.currentTarget.value)}
+                />
+              </label>
+            )}
 
             <button
               className="primary-action"
@@ -201,10 +222,10 @@ export function MotionPanel() {
             ) : null}
 
             <label>
-              <span>Fake motor power</span>
+              <span>{motionDraft.motorType === "Servo" ? "Fake servo position" : "Fake motor power"}</span>
               <input
                 max="1"
-                min="-1"
+                min={motionDraft.motorType === "Servo" ? "0" : "-1"}
                 step="0.01"
                 type="range"
                 value={motorPower}

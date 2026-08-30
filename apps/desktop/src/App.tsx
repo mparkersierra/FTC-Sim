@@ -1242,6 +1242,7 @@ function App() {
     });
 
     setTelemetryItems([]);
+    setMotorPowers({});
     const selected = opModes.find((item) => item.id === selectedOpModeId);
     setSimStatus("initialized");
     setStatusText(`Initialized: ${selected ? `${selected.modeType} - ${selected.name}` : selectedOpModeId}`);
@@ -1260,6 +1261,7 @@ function App() {
     setSimStatus("stopped");
     setStatusText("Stopped");
     setTelemetryItems([]);
+    setMotorPowers({});
   };
 
   const mainAction = () => {

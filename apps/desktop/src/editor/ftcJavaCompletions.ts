@@ -141,28 +141,28 @@ function annotationCompletions(monaco: MonacoApi, model: ITextModel, range: Mona
 }
 
 function snippetCompletions(monaco: MonacoApi, model: ITextModel, range: Monaco.IRange): CompletionItem[] {
-  const motorSnippets = ["DcMotorSimple", "DcMotor", "DcMotorEx"].flatMap((motorTypeName) => {
-    const motorType = activeTypesBySimpleName.get(motorTypeName);
+  const hardwareSnippets = ["DcMotorSimple", "DcMotor", "DcMotorEx", "Servo", "CRServo"].flatMap((typeName) => {
+    const hardwareType = activeTypesBySimpleName.get(typeName);
 
-    if (!motorType) {
+    if (!hardwareType) {
       return [];
     }
 
     return [
       {
-        label: `hardwareMap.get ${motorTypeName}`,
+        label: `hardwareMap.get ${typeName}`,
         kind: monaco.languages.CompletionItemKind.Snippet,
-        detail: `${motorTypeName} motor = hardwareMap.get(${motorTypeName}.class, "name")`,
-        insertText: `${motorTypeName} \${1:motor} = hardwareMap.get(${motorTypeName}.class, "\${2:name}");`,
+        detail: `${typeName} device = hardwareMap.get(${typeName}.class, "name")`,
+        insertText: `${typeName} \${1:device} = hardwareMap.get(${typeName}.class, "\${2:name}");`,
         insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
         range,
-        additionalTextEdits: importEditForType(monaco, model, motorType),
+        additionalTextEdits: importEditForType(monaco, model, hardwareType),
       },
     ];
   });
 
   return [
-    ...motorSnippets,
+    ...hardwareSnippets,
     {
       label: "telemetry.addData",
       kind: monaco.languages.CompletionItemKind.Snippet,

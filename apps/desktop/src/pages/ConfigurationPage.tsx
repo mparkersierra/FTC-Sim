@@ -72,16 +72,9 @@ export function ConfigurationPage({
             </button>
           </div>
         ))}
-      </div>
 
-      <h2>CAD Motion Motors</h2>
-
-      {cadMotorDevices.length === 0 ? (
-        <p className="binding-hint">No CAD motion motors saved yet.</p>
-      ) : (
-        <div>
-          {cadMotorDevices.map((item) => (
-            <div className="hardware-row cad-motor-row" key={item.motorName}>
+        {cadMotorDevices.map((item) => (
+          <div className="hardware-row cad-motor-row" key={item.motorName}>
               <output className="cad-motor-part" title={item.partNames.join(", ")}>
                 {item.partNames.join(", ")}
               </output>
@@ -107,9 +100,8 @@ export function ConfigurationPage({
                 value={item.motorName}
               />
             </div>
-          ))}
-        </div>
-      )}
+        ))}
+      </div>
 
       <h2>Gamepad Mapping</h2>
       <p className="binding-hint">{bindingHint}</p>

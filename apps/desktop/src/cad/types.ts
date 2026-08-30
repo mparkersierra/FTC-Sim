@@ -5,7 +5,7 @@ export type MotionType = "rotate" | "translate";
 export type Axis = "x" | "y" | "z";
 
 export type ModelOrientation = [number, number, number, number];
-export type CadMotorType = "DcMotor";
+export type CadMotorType = "DcMotor" | "Servo" | "CRServo";
 
 export interface MotionBehavior {
   id: string;

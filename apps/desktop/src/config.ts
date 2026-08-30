@@ -5,7 +5,7 @@ export const ROBOT_SIZE_INCHES = 18;
 export const MIN_TERMINAL_HEIGHT = 0;
 export const MAX_TERMINAL_HEIGHT = 520;
 
-export const hardwareTypes = ["DcMotor"] as const;
+export const hardwareTypes = ["DcMotor", "Servo", "CRServo"] as const;
 export const rootTeamCodeFolder = "(root)";
 
 export const teamCodeFileTemplates: Array<{ id: TeamCodeFileTemplate; label: string }> = [
