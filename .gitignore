@@ -61,4 +61,4 @@ dmg-staging/
 Thumbs.db
 
 # Cad
-apps/cad-backend/work/*
+apps/cad-backend/work/
