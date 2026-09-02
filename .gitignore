@@ -59,3 +59,6 @@ dmg-staging/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Cad
+apps/cad-backend/work/*
