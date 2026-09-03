@@ -9,7 +9,8 @@ mod teamcode;
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .setup(|_| {
+        .setup(|app| {
+            paths::init_app_paths(app).map_err(std::io::Error::other)?;
             runner::start_sim_runner_background(false);
             cad_backend::start_cad_backend_background(false);
             Ok(())

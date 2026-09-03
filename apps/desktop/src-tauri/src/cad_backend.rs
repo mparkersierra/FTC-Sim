@@ -1,14 +1,16 @@
 use std::{
-    env, fs,
+    fs,
     net::{TcpListener, TcpStream},
-    path::{Path, PathBuf},
     process::{Child, Command, Stdio},
     sync::{Mutex, OnceLock},
     thread,
     time::{Duration, Instant},
 };
 
-use crate::paths::{cad_backend_log_path, repo_root};
+use crate::paths::{
+    cad_backend_jar_path, cad_backend_log_path, cad_converter_path, cad_data_root, java_executable,
+    repo_root,
+};
 
 static CAD_BACKEND: OnceLock<Mutex<Option<Child>>> = OnceLock::new();
 static CAD_BACKEND_WORKER: OnceLock<Mutex<()>> = OnceLock::new();
@@ -17,63 +19,6 @@ static CAD_BACKEND_PORT: OnceLock<Mutex<Option<u16>>> = OnceLock::new();
 const PORT_RELEASE_TIMEOUT: Duration = Duration::from_secs(10);
 const PORT_RELEASE_POLL_INTERVAL: Duration = Duration::from_millis(100);
 const BACKEND_START_TIMEOUT: Duration = Duration::from_secs(8);
-
-fn java_binary_name() -> &'static str {
-    if cfg!(target_os = "windows") {
-        "java.exe"
-    } else {
-        "java"
-    }
-}
-
-fn is_usable_java_home(java_home: &Path) -> bool {
-    let java = java_home.join("bin").join(java_binary_name());
-    if !java.exists() {
-        return false;
-    }
-
-    if cfg!(target_os = "macos") {
-        return java_home.join("lib").join("libjli.dylib").exists();
-    }
-
-    true
-}
-
-fn java_home_candidates(root: &Path) -> Vec<PathBuf> {
-    let mut candidates = Vec::new();
-
-    candidates.push(root.join("runtime"));
-    candidates.push(root.join("runtime").join("Contents").join("Home"));
-
-    for parent in [root.join("runtime"), root.join("runtime").join("bin")] {
-        let Ok(entries) = fs::read_dir(parent) else {
-            continue;
-        };
-
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.extension().is_some_and(|extension| extension == "jdk") {
-                candidates.push(path.join("Contents").join("Home"));
-            }
-        }
-    }
-
-    if let Some(java_home) = env::var_os("JAVA_HOME") {
-        candidates.push(PathBuf::from(java_home));
-    }
-
-    candidates
-}
-
-fn java_executable(root: &Path) -> PathBuf {
-    for java_home in java_home_candidates(root) {
-        if is_usable_java_home(&java_home) {
-            return java_home.join("bin").join(java_binary_name());
-        }
-    }
-
-    PathBuf::from(java_binary_name())
-}
 
 fn dynamic_backend_port() -> Result<u16, String> {
     TcpListener::bind(("127.0.0.1", 0))
@@ -162,27 +107,14 @@ fn backend_log_stdio() -> Result<(Stdio, Stdio), String> {
     Ok((Stdio::from(log_file), Stdio::from(err_file)))
 }
 
-fn spawn_cad_backend(root: &Path, port: u16) -> Result<Child, String> {
+fn spawn_cad_backend(port: u16) -> Result<Child, String> {
     let (stdout, stderr) = backend_log_stdio()?;
-    let data_root = root.join("apps").join("cad-backend").join("work");
-    let converter = root
-        .join("native")
-        .join("cad-step-to-glb")
-        .join("build")
-        .join(if cfg!(target_os = "windows") {
-            "cad-step-to-glb.exe"
-        } else {
-            "cad-step-to-glb"
-        });
-    let backend_jar = root
-        .join("apps")
-        .join("cad-backend")
-        .join("build")
-        .join("libs")
-        .join("cad-motion-backend-0.1.0.jar");
+    let data_root = cad_data_root();
+    let converter = cad_converter_path();
+    let backend_jar = cad_backend_jar_path();
 
     if backend_jar.exists() {
-        return Command::new(java_executable(root))
+        return Command::new(java_executable())
             .arg("-jar")
             .arg(backend_jar)
             .arg("--port")
@@ -206,7 +138,7 @@ fn spawn_cad_backend(root: &Path, port: u16) -> Result<Child, String> {
             data_root.to_string_lossy(),
             converter.to_string_lossy()
         ))
-        .current_dir(root)
+        .current_dir(repo_root())
         .stdin(Stdio::null())
         .stdout(stdout)
         .stderr(stderr)
@@ -230,7 +162,6 @@ pub(crate) fn start_cad_backend_background(force_restart: bool) {
             return;
         }
 
-        let root = repo_root();
         let backend = CAD_BACKEND.get_or_init(|| Mutex::new(None));
 
         if let Ok(mut backend) = backend.lock() {
@@ -249,7 +180,7 @@ pub(crate) fn start_cad_backend_background(force_restart: bool) {
                 continue;
             }
 
-            let mut child = match spawn_cad_backend(&root, port) {
+            let mut child = match spawn_cad_backend(port) {
                 Ok(child) => child,
                 Err(error) => {
                     eprintln!("CAD backend restart attempt {attempt} failed to spawn: {error}");

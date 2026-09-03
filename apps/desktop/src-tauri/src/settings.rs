@@ -1,16 +1,13 @@
 use std::{fs, path::PathBuf};
 
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
+
+use crate::paths::writable_root;
 
 const GAMEPAD_MAPPING_FILE_NAME: &str = "gamepad-mapping.json";
 
-fn gamepad_mapping_path(app: &AppHandle) -> Result<PathBuf, String> {
-    let app_data_dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|error| format!("Failed to find app data directory: {error}"))?;
-
-    Ok(app_data_dir.join(GAMEPAD_MAPPING_FILE_NAME))
+fn gamepad_mapping_path(_app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(writable_root().join(GAMEPAD_MAPPING_FILE_NAME))
 }
 
 #[tauri::command]

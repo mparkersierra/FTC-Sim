@@ -7,6 +7,7 @@
     "generate:ftc-api": "node scripts/generate-ftc-java-api.mjs",
     "generate:jdk-api": "node scripts/generate-jdk-java-api.mjs",
     "generate:java-api": "npm run generate:ftc-api && npm run generate:jdk-api",
+    "prepare:mac-bundle": "../../scripts/prepare-macos-bundle-resources.sh",
     "dev": "npm run generate:java-api && vite",
     "build": "npm run generate:java-api && tsc && vite build",
     "build:mac:dmg": "../../scripts/build-macos-dmg.sh",

@@ -1,7 +1,6 @@
 use std::{
-    env, fs,
+    fs,
     net::{TcpListener, TcpStream},
-    path::{Path, PathBuf},
     process::{Child, Command, Stdio},
     sync::{Mutex, OnceLock},
     thread,
@@ -9,7 +8,7 @@ use std::{
 };
 
 use crate::{
-    paths::{repo_root, runner_log_path, teamcode_workspace_root},
+    paths::{java_executable, repo_root, runner_log_path, sim_runner_jar_path, teamcode_workspace_root},
     teamcode::ensure_teamcode_workspace,
 };
 
@@ -21,63 +20,6 @@ const TEAMCODE_COMPILE_STATUS_PREFIX: &str = "TEAMCODE_COMPILE_STATUS: ";
 const PORT_RELEASE_TIMEOUT: Duration = Duration::from_secs(10);
 const PORT_RELEASE_POLL_INTERVAL: Duration = Duration::from_millis(100);
 const RUNNER_START_TIMEOUT: Duration = Duration::from_secs(5);
-
-fn java_binary_name() -> &'static str {
-    if cfg!(target_os = "windows") {
-        "java.exe"
-    } else {
-        "java"
-    }
-}
-
-fn is_usable_java_home(java_home: &Path) -> bool {
-    let java = java_home.join("bin").join(java_binary_name());
-    if !java.exists() {
-        return false;
-    }
-
-    if cfg!(target_os = "macos") {
-        return java_home.join("lib").join("libjli.dylib").exists();
-    }
-
-    true
-}
-
-fn java_home_candidates(root: &Path) -> Vec<PathBuf> {
-    let mut candidates = Vec::new();
-
-    candidates.push(root.join("runtime"));
-    candidates.push(root.join("runtime").join("Contents").join("Home"));
-
-    for parent in [root.join("runtime"), root.join("runtime").join("bin")] {
-        let Ok(entries) = fs::read_dir(parent) else {
-            continue;
-        };
-
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.extension().is_some_and(|extension| extension == "jdk") {
-                candidates.push(path.join("Contents").join("Home"));
-            }
-        }
-    }
-
-    if let Some(java_home) = env::var_os("JAVA_HOME") {
-        candidates.push(PathBuf::from(java_home));
-    }
-
-    candidates
-}
-
-fn java_executable(root: &Path) -> PathBuf {
-    for java_home in java_home_candidates(root) {
-        if is_usable_java_home(&java_home) {
-            return java_home.join("bin").join(java_binary_name());
-        }
-    }
-
-    PathBuf::from(java_binary_name())
-}
 
 fn is_port_available(port: u16) -> bool {
     TcpListener::bind(("0.0.0.0", port)).is_ok()
@@ -168,20 +110,15 @@ fn runner_log_stdio() -> Result<(Stdio, Stdio), String> {
     Ok((Stdio::from(log_file), Stdio::from(err_file)))
 }
 
-fn spawn_sim_runner(root: &Path, port: u16) -> Result<Child, String> {
+fn spawn_sim_runner(port: u16) -> Result<Child, String> {
     ensure_teamcode_workspace()?;
 
     let teamcode_root = teamcode_workspace_root();
     let (stdout, stderr) = runner_log_stdio()?;
-    let runner_jar = root
-        .join("apps")
-        .join("runner")
-        .join("build")
-        .join("libs")
-        .join("runner-1.0.0.jar");
+    let runner_jar = sim_runner_jar_path();
 
     if runner_jar.exists() {
-        return Command::new(java_executable(root))
+        return Command::new(java_executable())
             .arg("-jar")
             .arg(runner_jar)
             .arg("--teamcode-root")
@@ -202,7 +139,7 @@ fn spawn_sim_runner(root: &Path, port: u16) -> Result<Child, String> {
             teamcode_root.to_string_lossy(),
             port
         ))
-        .current_dir(root)
+        .current_dir(repo_root())
         .stdin(Stdio::null())
         .stdout(stdout)
         .stderr(stderr)
@@ -226,7 +163,6 @@ pub(crate) fn start_sim_runner_background(force_restart: bool) {
             return;
         }
 
-        let root = repo_root();
         let runner = SIM_RUNNER.get_or_init(|| Mutex::new(None));
 
         if let Ok(mut runner) = runner.lock() {
@@ -245,7 +181,7 @@ pub(crate) fn start_sim_runner_background(force_restart: bool) {
                 continue;
             }
 
-            let mut child = match spawn_sim_runner(&root, port) {
+            let mut child = match spawn_sim_runner(port) {
                 Ok(child) => child,
                 Err(error) => {
                     eprintln!("Sim runner restart attempt {attempt} failed to spawn: {error}");
