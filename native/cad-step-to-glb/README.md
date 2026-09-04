@@ -38,10 +38,12 @@ native/cad-step-to-glb/build/cad-step-to-glb \
   --preview \
   --skip-pattern screw,bolt,nut,washer \
   --expand-pattern chassis,5103 \
-  --min-bbox 5
+  --min-bbox 5 \
+  --cpu-threads 8
 ```
 
 `--preview` enables coarser meshing and default hardware filtering. `--skip-pattern` and `--expand-pattern` are comma-separated. `--expand-pattern` matching ignores case, spaces, and punctuation. `--min-bbox` skips parts whose largest bounding-box dimension is smaller than the given millimeter value.
+`--cpu-threads` controls the OpenCascade worker pool size. Omit it to use all detected logical CPU cores.
 
 The Java backend looks for this executable by default:
 

@@ -16,5 +16,22 @@ target_include_directories(cad-step-to-glb PRIVATE
 )
 
 target_link_libraries(cad-step-to-glb PRIVATE
-  ${OpenCASCADE_LIBRARIES}
+  TKernel
+  TKMath
+  TKG2d
+  TKG3d
+  TKGeomBase
+  TKBRep
+  TKGeomAlgo
+  TKTopAlgo
+  TKMesh
+  TKCDF
+  TKLCAF
+  TKCAF
+  TKXCAF
+  TKXSBase
+  TKDE
+  TKDESTEP
+  TKRWMesh
+  TKDEGLTF
 )

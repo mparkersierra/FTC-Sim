@@ -17,6 +17,8 @@ if [[ ! -d "${APP_BUNDLE}" ]]; then
   exit 1
 fi
 
+codesign --force --deep --sign - "${APP_BUNDLE}"
+
 rm -rf "${STAGING_DIR}"
 mkdir -p "${STAGING_DIR}"
 

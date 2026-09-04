@@ -39,6 +39,8 @@ workspace/
 dmg-staging/
 *.dmg
 *.app/
+apps/desktop/src-tauri/resources/*
+!apps/desktop/src-tauri/resources/.gitkeep
 
 # Environment / local configuration
 .env

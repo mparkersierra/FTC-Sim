@@ -3,6 +3,8 @@
 #include <BRepMesh_IncrementalMesh.hxx>
 #include <IFSelect_ReturnStatus.hxx>
 #include <Message_ProgressRange.hxx>
+#include <OSD_Parallel.hxx>
+#include <OSD_ThreadPool.hxx>
 #include <RWGltf_CafWriter.hxx>
 #include <STEPCAFControl_Reader.hxx>
 #include <TCollection_AsciiString.hxx>
@@ -30,6 +32,7 @@
 #include <thread>
 #include <utility>
 #include <unordered_set>
+#include <vector>
 
 namespace fs = std::filesystem;
 
@@ -53,6 +56,7 @@ struct Args {
   double linearDeflection = 0.1;
   double angularDeflection = 0.523599;
   int selectionDepth = 1;
+  int cpuThreads = 0;
   std::vector<std::string> skipPatterns;
   std::vector<std::string> expandPatterns = {"chassis"};
 };
@@ -155,14 +159,41 @@ static Args parseArgs(int argc, char** argv) {
       args.angularDeflection = std::stod(argv[++index]);
     } else if (key == "--selection-depth" && index + 1 < argc) {
       args.selectionDepth = std::max(1, std::stoi(argv[++index]));
+    } else if (key == "--cpu-threads" && index + 1 < argc) {
+      args.cpuThreads = std::max(0, std::stoi(argv[++index]));
     } else {
       throw std::runtime_error("Unknown or incomplete argument: " + key);
     }
   }
 
   if (args.input.empty() || (args.inspectTree.empty() && (args.output.empty() || args.manifest.empty()))) {
-    throw std::runtime_error("usage: cad-step-to-glb --input robot.step --output robot.glb --manifest manifest.tsv OR --inspect-tree tree.txt");
+    throw std::runtime_error("usage: cad-step-to-glb --input robot.step --output robot.glb --manifest manifest.tsv [--cpu-threads N] OR --inspect-tree tree.txt");
   }
+
+  std::vector<std::string> uniqueSkipPatterns;
+  for (const std::string& pattern : args.skipPatterns) {
+    std::string normalizedPattern = trimCopy(pattern);
+    std::transform(
+        normalizedPattern.begin(),
+        normalizedPattern.end(),
+        normalizedPattern.begin(),
+        [](unsigned char ch) {
+          return static_cast<char>(std::tolower(ch));
+        });
+
+    bool alreadyAdded = false;
+    for (const std::string& uniquePattern : uniqueSkipPatterns) {
+      if (normalizedPattern == uniquePattern) {
+        alreadyAdded = true;
+        break;
+      }
+    }
+
+    if (!alreadyAdded && !normalizedPattern.empty()) {
+      uniqueSkipPatterns.push_back(normalizedPattern);
+    }
+  }
+  args.skipPatterns = std::move(uniqueSkipPatterns);
 
   return args;
 }
@@ -290,6 +321,31 @@ static bool shouldSkipLabel(
   return args.minBboxMm > 0 && bboxMaxDimension(shape) > 0 && bboxMaxDimension(shape) < args.minBboxMm;
 }
 
+static int availableCpuThreads() {
+  int threadCount = static_cast<int>(OSD_Parallel::NbLogicalProcessors());
+  if (threadCount > 0) {
+    return threadCount;
+  }
+
+  unsigned int fallbackThreadCount = std::thread::hardware_concurrency();
+  return fallbackThreadCount == 0 ? 1 : static_cast<int>(fallbackThreadCount);
+}
+
+static int configureParallelism(const Args& args) {
+  int threadCount = args.cpuThreads > 0 ? args.cpuThreads : availableCpuThreads();
+  threadCount = std::max(1, threadCount);
+
+  OSD_Parallel::SetUseOcctThreads(Standard_True);
+  const Handle(OSD_ThreadPool)& threadPool = OSD_ThreadPool::DefaultPool(threadCount);
+  if (!threadPool->IsInUse() && threadPool->NbThreads() != threadCount) {
+    threadPool->Init(threadCount);
+  }
+  threadPool->SetNbDefaultThreadsToLaunch(threadCount);
+  BRepMesh_IncrementalMesh::SetParallelDefault(Standard_True);
+
+  return threadPool->NbThreads();
+}
+
 static int filterComponents(
     const Handle(XCAFDoc_ShapeTool)& shapeTool,
     const TDF_Label& label,
@@ -320,27 +376,68 @@ static int filterComponents(
   return removed;
 }
 
-static void meshLabelShapes(const Handle(XCAFDoc_ShapeTool)& shapeTool, const TDF_Label& label, const Args& args) {
-  TopoDS_Shape shape = shapeTool->GetShape(label);
-  if (!shape.IsNull()) {
-    BRepMesh_IncrementalMesh mesh(
-        shape,
-        args.linearDeflection,
-        Standard_False,
-        args.angularDeflection,
-        Standard_True);
-    mesh.Perform();
+static void addUniqueShape(std::vector<TopoDS_Shape>& shapes, const TopoDS_Shape& shape) {
+  if (shape.IsNull()) {
+    return;
   }
 
+  for (const TopoDS_Shape& existingShape : shapes) {
+    if (existingShape.IsSame(shape)) {
+      return;
+    }
+  }
+
+  shapes.push_back(shape);
+}
+
+static void collectMeshShapes(
+    const Handle(XCAFDoc_ShapeTool)& shapeTool,
+    const TDF_Label& label,
+    std::vector<TopoDS_Shape>& shapes) {
   TDF_LabelSequence components;
-  if (shapeTool->GetComponents(label, components)) {
+  if (shapeTool->GetComponents(label, components) && components.Length() > 0) {
     for (Standard_Integer index = 1; index <= components.Length(); ++index) {
       TDF_Label referred;
       if (shapeTool->GetReferredShape(components.Value(index), referred)) {
-        meshLabelShapes(shapeTool, referred, args);
+        collectMeshShapes(shapeTool, referred, shapes);
+      } else {
+        collectMeshShapes(shapeTool, components.Value(index), shapes);
       }
     }
+    return;
   }
+
+  TopoDS_Shape shape = shapeTool->GetShape(label);
+  addUniqueShape(shapes, shape);
+}
+
+static void meshShape(const TopoDS_Shape& shape, const Args& args, bool useInnerParallelism) {
+  BRepMesh_IncrementalMesh mesh(
+      shape,
+      args.linearDeflection,
+      Standard_False,
+      args.angularDeflection,
+      useInnerParallelism ? Standard_True : Standard_False);
+  mesh.Perform();
+}
+
+static void meshShapes(const std::vector<TopoDS_Shape>& shapes, const Args& args) {
+  if (shapes.empty()) {
+    return;
+  }
+
+  if (shapes.size() == 1) {
+    meshShape(shapes.front(), args, true);
+    return;
+  }
+
+  OSD_Parallel::For(
+      0,
+      static_cast<Standard_Integer>(shapes.size()),
+      [&](Standard_Integer index) {
+        meshShape(shapes[static_cast<std::size_t>(index)], args, false);
+      },
+      Standard_False);
 }
 
 static int countLabels(const Handle(XCAFDoc_ShapeTool)& shapeTool, const TDF_Label& label) {
@@ -488,6 +585,8 @@ static void writeManifest(
 int main(int argc, char** argv) {
   try {
     Args args = parseArgs(argc, argv);
+    int configuredCpuThreads = configureParallelism(args);
+
     if (!args.output.empty()) {
       createParentDirectories(args.output);
     }
@@ -510,6 +609,9 @@ int main(int argc, char** argv) {
               << " linearDeflection=" << args.linearDeflection
               << " angularDeflection=" << args.angularDeflection
               << " selectionDepth=" << args.selectionDepth
+              << " cpuThreads=" << configuredCpuThreads
+              << " parallelMeshing=true"
+              << " parallelGltfWrite=true"
               << std::endl;
     if (!args.skipPatterns.empty()) {
       std::cout << "[occt] skipPatterns=";
@@ -583,10 +685,12 @@ int main(int argc, char** argv) {
 
     {
       StageTimer timer("mesh shapes");
+      std::vector<TopoDS_Shape> meshTargets;
       for (Standard_Integer index = 1; index <= roots.Length(); ++index) {
-        std::cout << "[occt] meshing root " << index << "/" << roots.Length() << std::endl;
-        meshLabelShapes(shapeTool, roots.Value(index), args);
+        collectMeshShapes(shapeTool, roots.Value(index), meshTargets);
       }
+      std::cout << "[occt] meshTargets=" << meshTargets.size() << std::endl;
+      meshShapes(meshTargets, args);
     }
 
     {
@@ -600,6 +704,7 @@ int main(int argc, char** argv) {
     {
       StageTimer timer("write GLB");
       RWGltf_CafWriter writer(TCollection_AsciiString(args.output.c_str()), Standard_True);
+      writer.SetParallel(true);
       if (!writer.Perform(document, fileInfo, Message_ProgressRange())) {
         throw std::runtime_error("OpenCascade failed to write GLB file: " + args.output);
       }
