@@ -3,6 +3,7 @@ import { apiUrl, backendAssetUrl, cadBackendBaseUrl } from "./api";
 import { setExpandPattern, setModelUrl, useCadStore } from "./cadStore";
 
 type QualityPreset = "fast" | "balanced" | "detailed";
+type ConversionStepId = "preparing" | "converting" | "loadingModel" | "refreshingModels";
 
 const qualitySettings: Record<
   QualityPreset,
@@ -36,6 +37,16 @@ const qualitySettings: Record<
     angularDeflection: 0.6,
   },
 };
+
+const conversionSteps: Array<{
+  id: ConversionStepId;
+  label: string;
+}> = [
+  { id: "preparing", label: "Preparing STEP upload" },
+  { id: "converting", label: "Converting STEP to GLB" },
+  { id: "loadingModel", label: "Loading generated model" },
+  { id: "refreshingModels", label: "Refreshing model list" },
+];
 
 interface ConversionResponse {
   modelUrl: string;
@@ -79,7 +90,9 @@ export function StepImportPanel() {
   const [generatedModels, setGeneratedModels] = useState<GeneratedModel[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [isConverting, setIsConverting] = useState(false);
+  const [conversionStep, setConversionStep] = useState<ConversionStepId | null>(null);
   const [isInspecting, setIsInspecting] = useState(false);
+  const activeConversionStep = conversionSteps.find((step) => step.id === conversionStep) ?? null;
   const activeGeneratedModel = useMemo(() => {
     const activePath = normalizedModelPath(modelUrl);
 
@@ -140,7 +153,8 @@ export function StepImportPanel() {
     }
 
     setIsConverting(true);
-    setStatus("Converting STEP to GLB...");
+    setConversionStep("preparing");
+    setStatus("Preparing STEP upload...");
 
     try {
       const formData = new FormData();
@@ -154,6 +168,10 @@ export function StepImportPanel() {
       formData.append("minBboxMm", String(minBboxMm));
       formData.append("linearDeflection", String(quality.linearDeflection));
       formData.append("angularDeflection", String(quality.angularDeflection));
+
+      setConversionStep("converting");
+      setStatus("Converting STEP to GLB. Large STEP files can take around 30 minutes depending on file size.");
+      await nextFrame();
 
       const response = await fetchWithRetry(apiUrl(backendBaseUrl, "/api/convert-step-upload"), {
         method: "POST",
@@ -169,15 +187,18 @@ export function StepImportPanel() {
         throw new Error(message ?? "Conversion failed.");
       }
 
+      setConversionStep("loadingModel");
       setModelUrl(`${backendAssetUrl(backendBaseUrl, payload.modelUrl)}?v=${Date.now()}`);
       setExpandPattern(expandPatternInput);
       setStatus(`Loaded ${payload.parts.length} parts from ${payload.modelUrl}.`);
       setIsManagingRobot(false);
+      setConversionStep("refreshingModels");
       await loadGeneratedModels();
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Conversion failed.");
     } finally {
       setIsConverting(false);
+      setConversionStep(null);
     }
   }
 
@@ -315,6 +336,19 @@ export function StepImportPanel() {
             {isConverting ? "Converting..." : "Convert STEP"}
           </button>
 
+          {isConverting && activeConversionStep ? (
+            <div
+              className="conversion-progress"
+              role="status"
+              aria-label="STEP conversion status"
+            >
+              <div className="conversion-progress-header">
+                <span>{activeConversionStep.label}</span>
+              </div>
+              <p>Large STEP files can take around 30 minutes depending on file size.</p>
+            </div>
+          ) : null}
+
           <button
             className="secondary-action"
             disabled={isInspecting}
@@ -391,6 +425,12 @@ async function fetchWithRetry(input: RequestInfo | URL, init?: RequestInit) {
   }
 
   throw lastError;
+}
+
+function nextFrame() {
+  return new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => resolve());
+  });
 }
 
 function formatBytes(bytes: number) {
