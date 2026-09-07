@@ -1,8 +1,9 @@
+import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join } from "node:path";
 
-const repoRoot = resolve(new URL("../../..", import.meta.url).pathname);
+const repoRoot = fileURLToPath(new URL("../../..", import.meta.url));
 const outputPath = join(repoRoot, "apps/desktop/src/editor/generatedJdkJavaApi.ts");
 
 const jdkClasses = [

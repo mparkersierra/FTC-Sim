@@ -1,7 +1,8 @@
+import { fileURLToPath } from "node:url";
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
-import { dirname, join, relative, resolve, sep } from "node:path";
+import { dirname, join, relative, sep } from "node:path";
 
-const repoRoot = resolve(new URL("../../..", import.meta.url).pathname);
+const repoRoot = fileURLToPath(new URL("../../..", import.meta.url));
 const sourceRoot = join(repoRoot, "libs/ftc-sdk-shim/src/main/java");
 const outputPath = join(repoRoot, "apps/desktop/src/editor/generatedFtcJavaApi.ts");
 

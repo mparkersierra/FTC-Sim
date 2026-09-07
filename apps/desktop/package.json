@@ -14,7 +14,9 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:dev": "npm run generate:java-api && tauri dev",
-    "tauri:build": "npm run generate:java-api && tauri build"
+    "tauri:build": "npm run generate:java-api && tauri build",
+    "prepare:windows-bundle": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ../../scripts/prepare-windows-bundle-resources.ps1",
+    "build:windows:installer": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ../../scripts/build-windows-installer.ps1"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",

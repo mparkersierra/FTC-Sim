@@ -117,16 +117,24 @@ pub(crate) fn cad_converter_path() -> PathBuf {
     };
 
     if cfg!(debug_assertions) {
-        return repo_root()
+        let build_dir = repo_root()
             .join("native")
             .join("cad-step-to-glb")
-            .join("build")
-            .join(executable);
+            .join("build");
+        return if cfg!(target_os = "windows") {
+            build_dir.join("windows").join("Release").join(executable)
+        } else {
+            build_dir.join(executable)
+        };
     }
 
     resource_root()
         .join("native")
-        .join("macos")
+        .join(if cfg!(target_os = "windows") {
+            "windows"
+        } else {
+            "macos"
+        })
         .join("bin")
         .join(executable)
 }

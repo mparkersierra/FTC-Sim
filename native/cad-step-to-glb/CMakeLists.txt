@@ -35,3 +35,11 @@ target_link_libraries(cad-step-to-glb PRIVATE
   TKRWMesh
   TKDEGLTF
 )
+
+if(WIN32)
+  target_compile_definitions(cad-step-to-glb PRIVATE NOMINMAX)
+  install(TARGETS cad-step-to-glb RUNTIME DESTINATION bin)
+  # Ship the redistributable MSVC runtime beside the converter.
+  set(CMAKE_INSTALL_SYSTEM_RUNTIME_DESTINATION bin)
+  include(InstallRequiredSystemLibraries)
+endif()
