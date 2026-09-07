@@ -40,7 +40,7 @@ $env:PATH = "$(Join-Path $env:JAVA_HOME 'bin');$env:PATH"
 Push-Location $RepoRoot
 try {
     Invoke-Checked (Join-Path $RepoRoot 'gradlew.bat') @(':apps:runner:jar', ':apps:cad-backend:jar')
-    Invoke-Checked $Vcpkg @('install', 'opencascade:x64-windows', "--x-install-root=$InstalledDir")
+    Invoke-Checked $Vcpkg @('install', 'opencascade[core,rapidjson,tbb]:x64-windows', "--x-install-root=$InstalledDir")
     Invoke-Checked 'cmake' @('-S', 'native/cad-step-to-glb', '-B', $BuildDir,
         '-G', 'Visual Studio 17 2022', '-A', 'x64', "-DCMAKE_TOOLCHAIN_FILE=$Toolchain",
         '-DVCPKG_TARGET_TRIPLET=x64-windows', "-DVCPKG_INSTALLED_DIR=$InstalledDir")

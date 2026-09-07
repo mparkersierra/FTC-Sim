@@ -1,0 +1,182 @@
+name: Build desktop releases
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-arm64
+            runner: macos-15
+            java-arch: aarch64
+            rust-target: aarch64-apple-darwin
+          - platform: windows-x64
+            runner: windows-2022
+            java-arch: x64
+            rust-target: x86_64-pc-windows-msvc
+    env:
+      CARGO_TERM_COLOR: always
+      VCPKG_DISABLE_METRICS: '1'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          architecture: ${{ matrix.java-arch }}
+          cache: gradle
+
+      - name: Check release version
+        if: github.ref_type == 'tag'
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          node <<'JS'
+          const fs = require('node:fs');
+          const version = JSON.parse(fs.readFileSync('apps/desktop/src-tauri/tauri.conf.json')).version;
+          if (process.env.RELEASE_TAG !== `v${version}`) {
+            throw new Error(`Release tag must be v${version}; update tauri.conf.json before tagging.`);
+          }
+          JS
+
+      - name: Install Rust toolchain
+        shell: bash
+        env:
+          RUST_TARGET: ${{ matrix.rust-target }}
+        run: |
+          rustup toolchain install stable --profile minimal --target "$RUST_TARGET"
+          rustup default stable
+
+      - name: Install macOS native dependencies
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          brew install cmake opencascade
+          echo "CMAKE_PREFIX_PATH=$(brew --prefix opencascade)" >> "$GITHUB_ENV"
+          xcode-select -p
+
+      - name: Check out pinned Windows dependency registry
+        if: runner.os == 'Windows'
+        uses: actions/checkout@v4
+        with:
+          repository: microsoft/vcpkg
+          ref: '2025.06.13'
+          path: .ci/vcpkg
+          persist-credentials: false
+
+      - name: Bootstrap Windows native dependency tools
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $vcpkgRoot = Join-Path $env:GITHUB_WORKSPACE '.ci/vcpkg'
+          & "$vcpkgRoot/bootstrap-vcpkg.bat" -disableMetrics
+          if ($LASTEXITCODE -ne 0) { throw 'vcpkg bootstrap failed' }
+          "VCPKG_ROOT=$vcpkgRoot" >> $env:GITHUB_ENV
+          $cacheDir = Join-Path $env:RUNNER_TEMP 'vcpkg-binary-cache'
+          New-Item -ItemType Directory -Force $cacheDir | Out-Null
+          "VCPKG_DEFAULT_BINARY_CACHE=$cacheDir" >> $env:GITHUB_ENV
+          # windows-2022 includes CMake, VS 2022/MSVC, and the Windows SDK.
+          cmake --version
+          if ($LASTEXITCODE -ne 0) { throw 'CMake is required' }
+
+      - name: Cache Windows native dependencies
+        if: runner.os == 'Windows'
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/vcpkg-binary-cache
+          key: windows-2022-vcpkg-2025.06.13-x64-${{ hashFiles('scripts/prepare-windows-bundle-resources.ps1') }}
+
+      - name: Install frontend dependencies
+        working-directory: apps/desktop
+        run: npm ci
+
+      - name: Build macOS DMG
+        if: runner.os == 'macOS'
+        working-directory: apps/desktop
+        run: npm run build:mac:dmg
+
+      - name: Build Windows installer and native dependencies
+        if: runner.os == 'Windows'
+        working-directory: apps/desktop
+        # This installs OpenCascade with RapidJSON and TBB before CMake builds the converter.
+        run: npm run build:windows:installer
+
+      - name: Collect macOS installer
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          mkdir -p release-assets
+          cp 'apps/desktop/src-tauri/target/release/bundle/macos/FTC-Sim.dmg' \
+            release-assets/FTC-Sim-macos-arm64.dmg
+
+      - name: Collect Windows installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force release-assets | Out-Null
+          $installers = @(Get-ChildItem 'apps/desktop/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*-setup.exe')
+          if ($installers.Count -ne 1) { throw "Expected one installer, found $($installers.Count)" }
+          Copy-Item $installers[0].FullName 'release-assets/FTC-Sim-windows-x64-setup.exe'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer-${{ matrix.platform }}
+          path: release-assets/*
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Publish GitHub release
+    needs: build
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: installer-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Create release and upload installers
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          test -s release-assets/FTC-Sim-macos-arm64.dmg
+          test -s release-assets/FTC-Sim-windows-x64-setup.exe
+          if gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" release-assets/* --clobber
+          else
+            prerelease=()
+            if [[ "$RELEASE_TAG" == *-* ]]; then prerelease=(--prerelease); fi
+            gh release create "$RELEASE_TAG" release-assets/* \
+              --verify-tag --title "FTC Sim $RELEASE_TAG" --generate-notes "${prerelease[@]}"
+          fi
