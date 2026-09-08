@@ -34,9 +34,9 @@ jobs:
       CARGO_TERM_COLOR: always
       VCPKG_DISABLE_METRICS: '1'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '22'
           cache: npm
@@ -81,7 +81,7 @@ jobs:
 
       - name: Check out pinned Windows dependency registry
         if: runner.os == 'Windows'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: microsoft/vcpkg
           ref: '2025.06.13'
@@ -105,7 +105,7 @@ jobs:
 
       - name: Cache Windows native dependencies
         if: runner.os == 'Windows'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ runner.temp }}/vcpkg-binary-cache
           key: windows-2022-vcpkg-2025.06.13-x64-${{ hashFiles('scripts/prepare-windows-bundle-resources.ps1') }}
@@ -142,7 +142,7 @@ jobs:
           if ($installers.Count -ne 1) { throw "Expected one installer, found $($installers.Count)" }
           Copy-Item $installers[0].FullName 'release-assets/FTC-Sim-windows-x64-setup.exe'
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: installer-${{ matrix.platform }}
           path: release-assets/*
@@ -157,7 +157,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           pattern: installer-*
           path: release-assets
