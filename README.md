@@ -76,7 +76,8 @@ npm ci
 npm run build:windows:installer
 ```
 
-The script builds the two Java JARs, installs `opencascade[core,rapidjson,tbb]:x64-windows` with vcpkg,
+The script builds the two Java JARs, installs `opencascade[core,rapidjson,tbb]:x64-windows-release` with vcpkg,
+builds native dependencies in Release only using `scripts/vcpkg-triplets/x64-windows-release.cmake`,
 compiles the CAD converter, packages its release DLLs and the MSVC runtime, creates
 a Windows Java runtime using `jlink`, and builds the Tauri NSIS setup executable.
 The first OpenCascade build may take a while. Tauri downloads installer tooling as
