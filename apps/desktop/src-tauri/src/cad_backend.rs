@@ -1,3 +1,5 @@
+use crate::java_process::java_path;
+
 use std::{
     fs,
     net::{TcpListener, TcpStream},
@@ -116,13 +118,13 @@ fn spawn_cad_backend(port: u16) -> Result<Child, String> {
     if backend_jar.exists() {
         return Command::new(java_executable())
             .arg("-jar")
-            .arg(backend_jar)
+            .arg(java_path(&backend_jar))
             .arg("--port")
             .arg(port.to_string())
             .arg("--data-root")
-            .arg(data_root)
+            .arg(java_path(&data_root))
             .arg("--converter")
-            .arg(converter)
+            .arg(java_path(&converter))
             .stdin(Stdio::null())
             .stdout(stdout)
             .stderr(stderr)

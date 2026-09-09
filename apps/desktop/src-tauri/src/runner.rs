@@ -1,3 +1,5 @@
+use crate::java_process::java_path;
+
 use std::{
     fs,
     net::{TcpListener, TcpStream},
@@ -8,7 +10,9 @@ use std::{
 };
 
 use crate::{
-    paths::{java_executable, repo_root, runner_log_path, sim_runner_jar_path, teamcode_workspace_root},
+    paths::{
+        java_executable, repo_root, runner_log_path, sim_runner_jar_path, teamcode_workspace_root,
+    },
     teamcode::ensure_teamcode_workspace,
 };
 
@@ -120,9 +124,9 @@ fn spawn_sim_runner(port: u16) -> Result<Child, String> {
     if runner_jar.exists() {
         return Command::new(java_executable())
             .arg("-jar")
-            .arg(runner_jar)
+            .arg(java_path(&runner_jar))
             .arg("--teamcode-root")
-            .arg(teamcode_root)
+            .arg(java_path(&teamcode_root))
             .arg("--port")
             .arg(port.to_string())
             .stdin(Stdio::null())

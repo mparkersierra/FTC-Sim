@@ -71,6 +71,16 @@ jobs:
           rustup toolchain install stable --profile minimal --target "$RUST_TARGET"
           rustup default stable
 
+      - name: Test Windows Java paths
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $testExe = Join-Path $env:RUNNER_TEMP 'java-path-tests.exe'
+          rustc --edition=2021 --test apps/desktop/src-tauri/src/java_process.rs -o $testExe
+          if ($LASTEXITCODE -ne 0) { throw 'Java path test compilation failed' }
+          & $testExe
+          if ($LASTEXITCODE -ne 0) { throw 'Java path tests failed' }
+
       - name: Install macOS native dependencies
         if: runner.os == 'macOS'
         shell: bash

@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod cad_backend;
+mod java_process;
 mod paths;
 mod runner;
 mod settings;
